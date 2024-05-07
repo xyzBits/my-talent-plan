@@ -1,1 +1,0 @@
-/Users/dongfang/work/talent/backend/my-talent-plan/courses/rust/projects/project-1-kvs/target/debug/libproject_1_kvs.rlib: /Users/dongfang/work/talent/backend/my-talent-plan/courses/rust/projects/project-1-kvs/src/lib.rs
