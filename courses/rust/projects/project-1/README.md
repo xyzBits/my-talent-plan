@@ -133,3 +133,68 @@ At this point you should be able to run the program with `cargo run`.
 _Try it now._
 
 You are set up for this project and read to start hacking.
+
+
+## Part 1: Make the tests compile
+
+You've been provided with a suite of unit tests in `tests/tests.rs`. Open it up and take a look.
+
+_Try to run the tests with `cargo test`._ What happens?
+
+Your first task for this project is to make the tests _compile_. Fun!
+
+If you project is like mine you probably saw a huge spew of build errors. Look at the first few. In general, when you see a bunch of errors, the first are the most important &mdash; `rustc` will keep trying to compile even after hiting errors, so errors can cascade, the later ones being pretty meaningless. Your first few eror probably look like:
+
+```
+error[E0433]: failed to resolve: use of undeclared crate or module `assert_cmd`
+ --> tests/tests.rs:1:5
+  |
+1 | use assert_cmd::prelude::*;
+  |     ^^^^^^^^^^ use of undeclared crate or module `assert_cmd`
+
+error[E0433]: failed to resolve: use of undeclared crate or module `predicates`
+ --> tests/tests.rs:3:5
+  |
+3 | use predicates::str::contains;
+```
+(If you are seeing something else, plese file an issue).
+
+These two errors are quite hard to diagnose to a new Rust programmer so I'll 
+just tell you what's going on there: you are missing  [dev-dependency] crates
+in your manifest.
+
+[dev-dependency]: https://doc.rust-lang.org/cargo/reference/specifying-dependencies.html#development-dependencies
+
+For this project your `Cargo.toml` needs to contain these lines:
+
+```toml 
+[dev-dependencies]
+assert_cmd = "0.11.0"
+predicates = "1.0.0"
+```
+
+The details of these dependencies are not important to yu completing the 
+project, but you might want to investigate them on you own. We didn't tell you
+about the need for dev-deps earlier just so you would experience these errors
+yourself. In future projects, the setup text will tell you the dev-deps you need.
+
+
+One quick note: how can you figure out that these error due to missing
+dependencies in your manifest and not due to error in your source code? Here's 
+one big clue, from the error shown previously: 
+
+```
+1 | use assert_cmd::prelude::*;
+  |     ^^^^^^^^^^ use of undeclared crate or module `assert_cmd`
+```
+
+In `use` statements the first path element is always the name of crate. The
+exception to this is when the first path element references a name that was
+previously brought into scope with _another_ `use` statement. In other words, if
+there had been another `use` statement in this file like `use foo::assert_cmd`,
+then use `assert_cmd::prelude::*` would refer to _that_ `assert_cmd`. There is
+more that could be said about this but we shouldn't go deeper into the nuances
+of path resolution here. Just know that, in general, in a `use` statement, if
+the first element in the path isn't found (i.e. cannot be resolved), the problem
+is probably that the crate hasn't been name in the manifest.
+
