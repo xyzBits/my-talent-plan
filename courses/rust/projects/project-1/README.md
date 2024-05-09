@@ -198,3 +198,190 @@ of path resolution here. Just know that, in general, in a `use` statement, if
 the first element in the path isn't found (i.e. cannot be resolved), the problem
 is probably that the crate hasn't been name in the manifest.
 
+When. That is an unfortunate a diversion in the very first project. But hopefully 
+instructive. 
+
+_Go ahead and add the appropriate dev-deps to your manifest._
+
+Try again to run the tests with `cargo test`. What happens? Why?
+
+Hopefully those _previous_ errors are gone. Now the errors are all about the
+test cases not being able to find all the code it expects in your own code. 
+
+_So now your task is to outline all the types, methods, etc. Necessary to make 
+the tests build._ 
+
+During this course you will read the test cases a lot. The test cases tell you 
+exactly what is expected of your code. If the text and the tests don't agree, 
+the tests are right (file a bug!). This is true in the real world too. The test 
+cases demonstrates what the software _actually_ does. They are reality. Get used 
+to reading test cases.
+
+And, bonus &mdash; test cases are often the poorest-written code in any project, 
+sloppy and undocumented.
+
+Again, try to run the tests with `cargo test`. What happens? Why?
+
+In `src/lib.rs` write the type and method definitions necessary to make
+`cargo test --no-run` complete successfully. Don't write any method bodies 
+yet &mdash; instead write `panic!()`. This is the way to sketch out your APIs 
+without knowing or caring about the implement (there's also the [`implemented!`]
+macro, but since typing it is longer, it's common to simply use `panic!()`, a 
+possible exception being if you are releasing software that contains 
+unimplemented methods).
+
+[`unimplemented!`]: https://doc.rust-lang.org/std/macro.unimplemented.html
+
+_Do that now before moving on._
+
+Once that is done, if you run `cargo test` (without `--no-run`),
+you should see that some of your tests are failing, like 
+
+```
+Finished `test` profile [unoptimized + debuginfo] target(s) in 0.18s
+     Running unittests src/lib.rs (target/debug/deps/kvs-3c579ef75f0bd95f)
+
+running 1 test
+test tests::it_works ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/bin/kvs.rs (target/debug/deps/kvs-c4b58c9d99d337e0)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/tests.rs (target/debug/deps/tests-e075401d36186b72)
+
+running 13 tests
+test remove_key ... FAILED
+test get_non_existent_value ... FAILED
+test get_stored_value ... FAILED
+test overwrite_value ... FAILED
+test cli_set ... FAILED
+test cli_get ... FAILED
+test cli_invalid_set ... FAILED
+test cli_rm ... FAILED
+test cli_no_args ... FAILED
+test cli_invalid_rm ... FAILED
+test cli_version ... FAILED
+test cli_invalid_get ... FAILED
+test cli_invalid_subcommand ... FAILED
+```
+
+... followed by many more lines. That's grate! That's all we need right now.
+You'll make those pass through the rest of this project.
+
+
+
+
+### Aside: Testing tips 
+
+If you look again at the output from `cargo test` you'll see something 
+interesting:
+
+```
+Running unittests src/bin/kvs.rs (target/debug/deps/kvs-c4b58c9d99d337e0)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/tests.rs (target/debug/deps/tests-e075401d36186b72)
+```
+
+Cargo says "Running ..." three times. And the first two of those times it in 
+fact did not run any tests. And furthermore, if all those tests hadn't failed, 
+cargo would have run _yet another_ set of tests. 
+
+Why is this?
+
+Well, it is because there are many places you can write tests in Rust:
+
+- Inside the source of your library
+- Inside the source of each of your binaries
+- Inside each test file 
+- In the doc comments of your library 
+
+And cargo doesn't known which of these actually contain tests, so it just builds 
+and runs them all. 
+
+So those two sets of empty tests: 
+
+```
+     Running target/debug/deps/kvs-b03a01e7008067f6
+running 0 tests
+     Running target/debug/deps/kvs-a3b5a004932c6715
+running 0 tests
+```
+
+Well, this is a bit confusing, but one of them is your library, compiled for 
+testing, and the other is your binary, compiled for testing. Neither contains 
+any tests. The reason both have "kvs" in their names is because both your
+library and your binary called "kvs".
+
+All this test spew gets annoying, and there re two ways to quiet cargo:
+with command line arguments, and with changes to the manifest. 
+
+Here are the relevant command line flags:
+
+- `cargo test --lib` &mdash; test just the tests inside the library
+- `cargo test --doc` &mdash; test the doc tests in the library
+- `cargo test --bins` &mdash; test all the bins in the project
+- `cargo test -- bin foo` &mdash; test just the `foo` bin
+- `cargo test --test foo` &mdash; test the tests in the test file `foo`
+
+These are convenient to quickly hide test spew, but if a project doesn't contain 
+a type of tests it's probably bet to just never deal with them. If you recall
+from the Cargo Book's [manifest description][m], there are two keys that can be 
+applied: `test = false` and `doctest = false`. They go in the `[lib]` and 
+`[bin]` sections. Consider updating your manifest. 
+
+[m]: https://doc.rust-lang.org/cargo/reference/manifest.html
+
+
+Another quick thing to do if you haven't before. Run this:
+
+```
+cargo test -- --help
+```
+
+Just do it. It's cool. What you are seeing there is the help information for 
+_the executable containing your complied test_ (that `--` surround by spaces
+tells cargo to pass all following arguments to the test library). It's not 
+the same info displayed when you run `cargo test --help`. They are two different
+things: cargo is running your test bin by passing it all these various arguments.
+
+If you want you can do exactly the same thing. Let's go back one more time 
+to our `cargo test` example. We saw this line: 
+
+```
+     Running target/debug/deps/kvs-b03a01e7008067f6
+```
+
+That's cargo telling you the name of the test binary. You can run it 
+yourself, like `target/debug/deps/kvs-b03a01e7008067f6 --help`.
+
+The `target` directory contains lots of cool stuff. Digging through it can 
+teach you a lot about what the Rust toolchain is actually doing. 
+
+In practice, particularly with large projects, you won't run the entire test 
+suite while developing a single feature. To narrow down the set of tests to the
+ones we care about, run the following:
+
+```
+cargo test cli_no_args
+```
+
+This will run the test called `cli_no_args`. In fact, it will run any test
+containing `cli_no_args` in the name, so if, e.g., you want to run all the CLI
+tests, you can run `cargo test cli`. That's probably how you will be running the 
+tests yourself as you work through the project, otherwise you will be distracted 
+by many failing tests that have not yet fixed. Unfortunately that 
+pattern is a simple substring match, not something fancy like a regular expression.
+
+## Part 2: Accept command line arguments 
+
+
+
