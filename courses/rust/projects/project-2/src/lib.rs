@@ -1,14 +1,9 @@
-pub fn add(left: usize, right: usize) -> usize {
-    left + right
-}
+// #[deny(missing_docs)]
+//! A simple key/value store.
 
-#[cfg(test)]
-mod tests {
-    use super::*;
 
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
-    }
-}
+pub use kv::KvStore;
+pub use error::{Result, KvsError};// 在这里声明，其他地方才可以用
+
+mod kv;
+mod error;
