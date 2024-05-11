@@ -1,6 +1,9 @@
 [package]
 name = "kvs"
 version = "0.1.0"
+authors = ["A talent <a-talent@gamil.com>"]
+description = "A key-value store"
 edition = "2021"
 
 [dependencies]
+clap = "2.32.0"
