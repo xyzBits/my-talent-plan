@@ -24,6 +24,9 @@ pub struct KvStore {
 }
 
 
+impl KvStore {
+
+}
 
 
 /// Struct representing a command
