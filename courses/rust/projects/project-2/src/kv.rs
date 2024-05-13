@@ -1,11 +1,14 @@
 use std::collections::{BTreeMap, HashMap};
+use std::ffi::OsStr;
 use std::fs;
 use std::fs::{File, OpenOptions};
 use std::io::{BufReader, BufWriter, Read, Seek, SeekFrom, Write};
 use std::ops::Range;
 use std::path::{Path, PathBuf};
+use std::ptr::read;
 
 use serde::{Deserialize, Serialize};
+use serde_json::Deserializer;
 
 use crate::Result;
 
@@ -136,18 +139,58 @@ fn new_log_file(
 }
 
 /// Returns sorted generation numbers in the given directory
-fn sorted_gen_list(path: &Path) -> Result<Vec<u64>> {
-    let mut gen_list = fs::read_dir(&path);
+pub fn sorted_gen_list(path: &Path) -> Result<Vec<u64>> {
+    let mut gen_list = fs::read_dir(&path)?
+        .flat_map(|res| -> Result<_> { Ok(res?.path()) })
+        .filter(|path| path.is_file() && path.extension() == Some("log".as_ref()))
+        .flat_map(|path| {
+            path.file_name()
+                .and_then(OsStr::to_str)
+                .map(|s| s.trim_end_matches(".log"))
+                .map(str::parse::<u64>)
+        })
+        .flatten()
+        .collect::<Vec<u64>>();
 
-    Ok(vec![])
+    gen_list.sort_unstable();
+
+
+    Ok(gen_list)
 }
 
+/// Load the whole log file and store value locations in the index map
+///
+/// Returns how many bytes can be saved after a compaction
 fn load(
     gen: u64,
     reader: &mut BufReaderWithPos<File>,
     index: &mut BTreeMap<String, CommandPos>,
 ) -> Result<u64> {
-    Ok(0)
+    // To make sure we read from the beginning of the file.
+    let mut pos = reader.seek(SeekFrom::Start(0))?;
+    let mut stream = Deserializer::from_reader(reader).into_iter::<Command>();
+    let mut uncompacted = 0; // number of bytes that can be saved after a compaction
+
+    while let Some(cmd) = stream.next() {
+        let new_pos = stream.byte_offset() as u64;
+        match cmd? {
+            Command::Set { key, .. } => {
+                if let Some(old_cmd) = index.insert(key, (gen, pos..new_pos).into()) {
+                    uncompacted += old_cmd.len;
+                }
+            }
+            Command::Remove { key    } => {
+                if let Some(old_cmd) = index.remove(&key) {
+                    uncompacted += old_cmd.len;
+                }
+                // the "remove" command itself can be deleted in the next compaction
+                // so we add its length to `uncompacted`
+                uncompacted += new_pos - pos;
+            }
+        }
+        pos = new_pos;
+    }
+    Ok(uncompacted)
 }
 
 fn log_path(dir: &Path, gen: u64) -> PathBuf {
