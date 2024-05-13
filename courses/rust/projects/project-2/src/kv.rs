@@ -1,16 +1,15 @@
 use std::collections::{BTreeMap, HashMap};
 use std::ffi::OsStr;
-use std::fs;
+use std::{fs, io};
 use std::fs::{File, OpenOptions};
 use std::io::{BufReader, BufWriter, Read, Seek, SeekFrom, Write};
 use std::ops::Range;
 use std::path::{Path, PathBuf};
-use std::ptr::read;
 
 use serde::{Deserialize, Serialize};
 use serde_json::Deserializer;
 
-use crate::Result;
+use crate::{KvsError, Result};
 
 // 使用其他 lib 中的 crate，一定要用 crate:: 声明
 const COMPACTION_THRESHOLD: u64 = 1024 * 1024;
@@ -106,7 +105,7 @@ impl KvStore {
         serde_json::to_writer(&mut self.writer, &cmd)?;
         self.writer.flush()?;
 
-        if let Command::Set {key, ..} = cmd {
+        if let Command::Set { key, .. } = cmd {
             if let Some(old_cmd) = self
                 .index
                 .insert(key, (self.current_gen, pos..self.writer.pos).into()) {
@@ -121,18 +120,103 @@ impl KvStore {
         Ok(())
     }
 
-    pub fn get(&self, key: String) -> Result<Option<String>> {
-        Ok(None)
+    /// Get the string value of a given string key.
+    ///
+    /// Returns `None` if the given key does not exist.
+    ///
+    /// # Errors
+    ///
+    /// If returns `KvsError::UnexpectedCommandType` if the given command type unexpected.
+    pub fn get(&mut self, key: String) -> Result<Option<String>> {
+        if let Some(cmd_pos) = self.index.get(&key) {
+            let reader = self
+                .readers
+                .get_mut(&cmd_pos.gen)
+                .expect("Cannot find log reader");
+
+            reader.seek(SeekFrom::Start(cmd_pos.pos))?;
+            let cmd_reader = reader.take(cmd_pos.len);
+            if let Command::Set { value, .. } = serde_json::from_reader(cmd_reader)? {
+                Ok(Some(value))
+            } else {
+                Err(KvsError::UnexpectedCommandType)
+            }
+        } else {
+            Ok(None)
+        }
     }
 
+
+    /// Removes a given key.
+    ///
+    /// # Errors
+    ///
+    /// It returns `KvsError::KeyNotFound` if the given key is not found.
+    ///
+    /// It propagates I/O or serialization errors during writing the log.
     pub fn remove(&mut self, key: String) -> Result<()> {
-        Ok(())
+        if self.index.contains_key(&key) {
+            let cmd = Command::remove(key);
+            serde_json::to_writer(&mut self.writer, &cmd)?;
+            self.writer.flush()?;
+            if let Command::Remove { key } = cmd {
+                let old_cmd = self.index.remove(&key).expect("key not found");
+                self.uncompacted += old_cmd.len;
+            }
+            Ok(())
+        } else {
+            Err(KvsError::KeyNotFound)
+        }
     }
 
+    /// Clears stale entries in the log
     pub fn compact(&mut self) -> Result<()> {
+        // increase current gen by 2. current_gen + 1 is for the compaction file
+        let compaction_gen = self.current_gen + 1;
+        self.current_gen += 2;
+        self.writer = self.new_log_file(self.current_gen)?;
+
+        let mut compaction_writer = self.new_log_file(compaction_gen)?;
+
+        let mut new_pos = 0; // pos in the new log file
+        for cmd_pos in &mut self.index.values_mut() {
+            let reader = self
+                .readers
+                .get_mut(&cmd_pos.gen)
+                .expect("Cannot find log reader");
+
+            if reader.pos != cmd_pos.pos {
+                reader.seek(SeekFrom::Start(cmd_pos.pos))?;
+            }
+
+            let mut entry_reader = reader.take(cmd_pos.len);
+            let len = io::copy(&mut entry_reader, &mut compaction_writer)?;
+            *cmd_pos = (compaction_gen, new_pos..new_pos + len).into();
+            new_pos += len;
+        }
+
+        compaction_writer.flush()?;
+
+        // remove stale log files.
+        let stale_gens: Vec<_> = self
+            .readers
+            .keys()
+            .filter(|&&gen| gen < compaction_gen)
+            .cloned()
+            .collect();
+
+        for stale_gen in stale_gens {
+            self.readers.remove(&stale_gen);
+            fs::remove_file(log_path(&self.path, stale_gen))?;
+        }
+        self.uncompacted = 0;
+
         Ok(())
     }
 
+    /// Create a new log file with given generation number and add the reader to the readers map.
+    ///
+    /// Return the writer to the log
     fn new_log_file(&mut self, gen: u64) -> Result<BufWriterWithPos<File>> {
         new_log_file(&self.path, gen, &mut self.readers)
     }
@@ -202,7 +286,7 @@ fn load(
                     uncompacted += old_cmd.len;
                 }
             }
-            Command::Remove { key    } => {
+            Command::Remove { key } => {
                 if let Some(old_cmd) = index.remove(&key) {
                     uncompacted += old_cmd.len;
                 }
