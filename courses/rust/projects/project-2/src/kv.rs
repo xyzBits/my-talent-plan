@@ -1,10 +1,10 @@
 use std::collections::{BTreeMap, HashMap};
 use std::ffi::OsStr;
-use std::{fs, io};
 use std::fs::{File, OpenOptions};
 use std::io::{BufReader, BufWriter, Read, Seek, SeekFrom, Write};
 use std::ops::Range;
 use std::path::{Path, PathBuf};
+use std::{fs, io};
 
 use serde::{Deserialize, Serialize};
 use serde_json::Deserializer;
@@ -13,7 +13,6 @@ use crate::{KvsError, Result};
 
 // 使用其他 lib 中的 crate，一定要用 crate:: 声明
 const COMPACTION_THRESHOLD: u64 = 1024 * 1024;
-
 
 /// The `KvStore` stores string key/value pairs
 /// Key/value paris are persisted to disk on log files. Log files are name after
@@ -53,7 +52,6 @@ pub struct KvStore {
     uncompacted: u64,
 }
 
-
 impl KvStore {
     /// Opens a `KvStore` with the given path.
     ///
@@ -82,7 +80,6 @@ impl KvStore {
         let current_gen = gen_list.last().unwrap_or(&0) + 1;
         let writer = new_log_file(&path, current_gen, &mut readers)?;
 
-
         Ok(KvStore {
             path,
             readers,
@@ -108,7 +105,8 @@ impl KvStore {
         if let Command::Set { key, .. } = cmd {
             if let Some(old_cmd) = self
                 .index
-                .insert(key, (self.current_gen, pos..self.writer.pos).into()) {
+                .insert(key, (self.current_gen, pos..self.writer.pos).into())
+            {
                 self.uncompacted += old_cmd.len;
             }
         }
@@ -145,7 +143,6 @@ impl KvStore {
             Ok(None)
         }
     }
-
 
     /// Removes a given key.
     ///
@@ -261,7 +258,6 @@ pub fn sorted_gen_list(path: &Path) -> Result<Vec<u64>> {
 
     gen_list.sort_unstable();
 
-
     Ok(gen_list)
 }
 
@@ -304,7 +300,6 @@ fn log_path(dir: &Path, gen: u64) -> PathBuf {
     dir.join(format!("{}.log", gen))
 }
 
-
 /// Struct representing a command
 #[derive(Serialize, Deserialize, Debug)]
 enum Command {
@@ -321,7 +316,6 @@ impl Command {
         Command::Remove { key }
     }
 }
-
 
 /// Represents the position and length of a json-serialized command in the log
 struct CommandPos {
@@ -356,7 +350,6 @@ impl<R: Read + Seek> BufReaderWithPos<R> {
     }
 }
 
-
 impl<R: Read + Seek> Read for BufReaderWithPos<R> {
     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
         let len = self.reader.read(buf)?;
@@ -388,7 +381,6 @@ impl<W: Write + Seek> BufWriterWithPos<W> {
     }
 }
 
-
 impl<W: Write + Seek> Write for BufWriterWithPos<W> {
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
         let len = self.writer.write(buf)?;
@@ -407,16 +399,3 @@ impl<W: Write + Seek> Seek for BufWriterWithPos<W> {
         Ok(self.pos)
     }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-

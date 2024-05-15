@@ -22,9 +22,7 @@ pub enum KvsError {
     /// It indicated a corrupted log or a program bug
     #[fail(display = "Unexpected command")]
     UnexpectedCommandType,
-
 }
-
 
 impl From<io::Error> for KvsError {
     fn from(err: Error) -> Self {
@@ -38,10 +36,8 @@ impl From<serde_json::Error> for KvsError {
     }
 }
 
-
 /// Result type for kvs
 pub type Result<T> = std::result::Result<T, KvsError>;
-
 
 #[cfg(test)]
 mod error_test {
@@ -62,35 +58,22 @@ mod error_test {
 
         println!("{:?}", num);
     }
-    
+
     #[test]
     fn test_into_trait() {
-        
         #[derive(Debug)]
         struct Number {
-            value: i32, 
+            value: i32,
         }
-        
+
         impl Into<Number> for i32 {
             fn into(self) -> Number {
-                Number {value: self}
+                Number { value: self }
             }
         }
 
         let x = 5;
         let number: Number = x.into();
         println!("{:?}", number);
-
-
     }
 }
-
-
-
-
-
-
-
-
-
-
