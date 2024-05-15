@@ -1,3 +1,4 @@
+use std::fmt::Display;
 use tempfile::TempDir;
 use kvs::{KvStore, Result};
 
@@ -34,3 +35,4 @@ fn get_stored_value() -> Result<()> {
 
 
 }
+
