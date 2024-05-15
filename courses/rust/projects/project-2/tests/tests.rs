@@ -1,3 +1,4 @@
+use std::path::PathBuf;
 use tempfile::TempDir;
 use kvs::{KvStore, Result};
 
@@ -19,6 +20,8 @@ fn cli_version() {
 #[test]
 fn get_stored_value() -> Result<()> {
     let temp_dir = TempDir::new().expect("unable to create temporary working directory");
+
+    let x:PathBuf = temp_dir.path().into();
     let mut store = KvStore::open(temp_dir.path())?;
 
     store.set("key1".to_owned(), "value1".to_owned())?;
