@@ -2,13 +2,14 @@ use std::collections::{BTreeMap, HashMap};
 use std::env::current_dir;
 use std::ffi::OsStr;
 use std::fmt::Display;
-use std::fs;
+use std::{fs, io};
 use std::fs::File;
-use std::io::{Seek, SeekFrom};
+use std::io::{BufRead, BufReader, Seek, SeekFrom};
 use std::path::PathBuf;
 use std::process::Command;
 
 use serde_json::Deserializer;
+use tempfile::TempDir;
 
 use kvs::{ Result};
 
@@ -28,6 +29,10 @@ fn test_hello() {
 fn test_into_path_buf() {
     let mut path_buf = PathBuf::new();
     path_buf.push(".");
+
+    let temp_dir = TempDir::new().expect("unable to create temporary working directory");
+
+    let path = temp_dir.path();
 }
 
 fn open_path(path: impl Into<PathBuf>) {}
@@ -64,7 +69,46 @@ fn test_as_ref() {
 }
 
 
+#[test]
+fn test_seek_trait() -> io::Result<()> {
+    let mut file = File::open("Cargo.toml")?;
 
+    // mov ethe cursor 42 bytes from the start of the file
+    let result = file.seek(SeekFrom::Start(42))?;
+
+    println!("{}", result);
+
+
+    Ok(())
+}
+
+#[test]
+fn test_path_join() -> io::Result<()> {
+    let path_buf = current_dir()?;
+
+    let buf = path_buf.join("/hello");
+
+    println!();
+
+    Ok(())
+}
+
+
+#[test]
+fn test_buffer_reader() -> std::io::Result<()>{
+    let file = File::open("Cargo.toml")?;
+
+    let mut reader = BufReader::new(file);
+
+    let mut line = String::new();
+
+    // read all byte until a new line
+    let len = reader.read_line(&mut line)?;
+    println!("{}", len);
+
+    Ok(())
+
+}
 
 
 

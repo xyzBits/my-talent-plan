@@ -1,3 +1,4 @@
+use std::path::PathBuf;
 use assert_cmd::prelude::*;
 use kvs::{KvStore, Result};
 use predicates::ord::eq;
@@ -69,9 +70,15 @@ fn cli_set() {
 fn cli_get_stored() -> Result<()> {
     let temp_dir = TempDir::new().expect("unable to create temporary working directory");
 
-    let mut store = KvStore::open(temp_dir.path())?;
+    let path = temp_dir.path();
+
+    let mut store = KvStore::open(path)?;
     store.set("key1".to_owned(), "value1".to_owned())?;
     store.set("key2".to_owned(), "value2".to_owned())?;
+
+    store.set("hello".to_owned(), "world".to_owned())?;
+
+    store.set("hello".to_owned(), "rust".to_owned())?;
     drop(store);
 
     Command::cargo_bin("kvs")

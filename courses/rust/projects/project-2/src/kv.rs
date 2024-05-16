@@ -13,7 +13,9 @@ use serde_json::Deserializer;
 use crate::{KvsError, Result};
 
 // 使用其他 lib 中的 crate，一定要用 crate:: 声明
-const COMPACTION_THRESHOLD: u64 = 1024 * 1024;
+
+// unit of this threshold is bytes, 1024 * 1024 bytes = 1 KB
+const COMPACTION_THRESHOLD: u64 = 1024 * 104;
 
 /// The `KvStore` stores string key/value pairs
 /// Key/value paris are persisted to disk on log files. Log files are name after
@@ -46,6 +48,8 @@ pub struct KvStore {
 
     current_gen: u64,
 
+    // key: <"hello", "world"> hello is key, commandPos is the position of command in xxx.log file
+    // <key, key position in log file>
     index: BTreeMap<String, CommandPos>,
 
     // the number of bytes representing "stale" commands that could be
@@ -61,9 +65,16 @@ impl KvStore {
     /// # Errors
     ///
     /// It propagates I/O or deserialization errors during the log replay.
-    pub fn open(path: impl Into<PathBuf>) -> Result<KvStore> {
+    // pub fn open(path: impl Into<PathBuf>) -> Result<KvStore>  {
+    pub fn open<T>(path: T) -> Result<KvStore>
+        where T: Into<PathBuf> {
+        // In Rust, Impl Trait in an argument position is syntactic sugar for a generic type parameter like <T: Trait>.
+        // However, the type is anonymous and doesn't appear in the GenericParam list.
+
+
         let path = path.into();
 
+        // Recursively create a directory and all of its parent components if they are missing.
         fs::create_dir_all(&path)?;
 
         let mut readers = HashMap::new();
@@ -133,7 +144,9 @@ impl KvStore {
                 .get_mut(&cmd_pos.gen)
                 .expect("Cannot find log reader");
 
+            //Seek to an offset, in bytes, in a stream.
             reader.seek(SeekFrom::Start(cmd_pos.pos))?;
+
             let cmd_reader = reader.take(cmd_pos.len);
             if let Command::Set { value, .. } = serde_json::from_reader(cmd_reader)? {
                 Ok(Some(value))
@@ -327,9 +340,11 @@ impl Command {
 
 /// Represents the position and length of a json-serialized command in the log
 struct CommandPos {
-    gen: u64,
-    pos: u64,
-    len: u64,
+    // {"Set":{"key":"key1","value":"value1"}}, if this is first command in 1.log,
+    // gen = 1, pos = 0, len = 39
+    gen: u64,// prefix of the gen.log file
+    pos: u64,// start position of command
+    len: u64,// the length of the serialized command bytes
 }
 
 impl From<(u64, Range<u64>)> for CommandPos {
