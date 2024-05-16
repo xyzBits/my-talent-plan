@@ -1,10 +1,11 @@
+use std::{fs, io};
 use std::collections::{BTreeMap, HashMap};
+use std::env::current_dir;
 use std::ffi::OsStr;
 use std::fs::{File, OpenOptions};
 use std::io::{BufReader, BufWriter, Read, Seek, SeekFrom, Write};
 use std::ops::Range;
 use std::path::{Path, PathBuf};
-use std::{fs, io};
 
 use serde::{Deserialize, Serialize};
 use serde_json::Deserializer;
@@ -244,9 +245,16 @@ fn new_log_file(
 
 /// Returns sorted generation numbers in the given directory
 pub fn sorted_gen_list(path: &Path) -> Result<Vec<u64>> {
+
+    // return an iterator over the entry within a directory
     let mut gen_list = fs::read_dir(&path)?
+
         .flat_map(|res| -> Result<_> { Ok(res?.path()) })
+
+        // single expression, you do not need to write -> {} can be ignored
         .filter(|path| path.is_file() && path.extension() == Some("log".as_ref()))
+
+
         .flat_map(|path| {
             path.file_name()
                 .and_then(OsStr::to_str)
@@ -398,4 +406,73 @@ impl<W: Write + Seek> Seek for BufWriterWithPos<W> {
         self.pos = self.writer.seek(pos)?;
         Ok(self.pos)
     }
+}
+
+
+#[test]
+fn test_current_dir() -> crate::Result<()> {
+    let current_dir = current_dir();
+
+    let path: PathBuf = current_dir?.into();
+
+    fs::create_dir_all(&path)?;
+
+    let read_dir = fs::read_dir(&path)?;// iterator
+
+
+    let step_one
+        = read_dir.flat_map(|res| -> crate::Result<_> { Ok(res?.path()) });
+
+
+    let step_two =
+        step_one.filter(|path| path.is_file() && path.extension() == Some("log".as_ref()));
+
+
+    let step_three = step_two.flat_map(|path| {
+        path.file_name()
+            .and_then(OsStr::to_str)
+            .map(|s| s.trim_end_matches(".log"))
+            .map(str::parse::<u64>)
+    });
+
+    let mut gen_list = step_three
+        .flatten()
+        .collect::<Vec<u64>>();
+
+    gen_list.sort_unstable();
+
+    let gen = 1;
+    let new_path = &path.join(format!("{}.log", gen));
+
+    let file = File::open(new_path)?;
+
+    let mut readers: HashMap<u64, BufReaderWithPos<File>> = HashMap::new();
+    let mut index: BTreeMap<String, CommandPos> = BTreeMap::new();
+
+    let mut reader = BufReaderWithPos::new(file)?;
+
+    let mut pos = (&mut reader).seek(SeekFrom::Start(0))?;
+
+    let mut stream =
+        Deserializer::from_reader(&mut reader).into_iter::<Command>();
+
+    let mut uncompacted = 0;
+
+    while let Some(cmd) = stream.next() {
+        let new_pos = stream.byte_offset() as u64;
+        match cmd? {
+            Command::Set { key, .. } => {
+                if let Some(old_cmd) = index.insert(key, (gen, pos..new_pos).into()) {
+                    uncompacted += old_cmd.len;
+                }
+            }
+            _ => {}
+        }
+        pos = new_pos;
+    }
+
+
+    println!();
+
+    Ok(())
 }

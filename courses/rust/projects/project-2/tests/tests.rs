@@ -9,7 +9,11 @@ use walkdir::WalkDir;
 // `kvs` with no args should exit with a non-zero code.
 #[test]
 fn cli_no_args() {
-    Command::cargo_bin("kvs").unwrap().assert().failure();
+    let result = Command::cargo_bin("kvs");
+    result
+        .unwrap()
+        .assert()
+        .failure();
 }
 
 // `kvs -V` should print the version

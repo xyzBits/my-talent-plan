@@ -2,7 +2,6 @@ use std::{env::current_dir, process::exit};
 
 use clap::{App, AppSettings, Arg, SubCommand};
 use kvs::{KvStore, KvsError, Result};
-use serde_json::map::Keys;
 
 fn main() -> Result<()> {
     let matches = App::new(env!("CARGO_PKG_NAME"))
