@@ -15,7 +15,7 @@ use crate::{KvsError, Result};
 // 使用其他 lib 中的 crate，一定要用 crate:: 声明
 
 // unit of this threshold is bytes, 1024 * 1024 bytes = 1 KB
-const COMPACTION_THRESHOLD: u64 = 1024 * 104;
+const COMPACTION_THRESHOLD: u64 = 1024 * 1024;
 
 /// The `KvStore` stores string key/value pairs
 /// Key/value paris are persisted to disk on log files. Log files are name after
@@ -40,7 +40,7 @@ pub struct KvStore {
     // directory for the log and other data
     path: PathBuf,
 
-    // map generation number to the file reader
+    // map generation number to the file reader // each x.log file has its own reader
     readers: HashMap<u64, BufReaderWithPos<File>>,
 
     // writer of the current log
@@ -84,11 +84,14 @@ impl KvStore {
         let mut uncompacted = 0;
 
         for &gen in &gen_list {
+            // initiate a reader for each x.log file and insert it into readers map
             let mut reader = BufReaderWithPos::new(File::open(log_path(&path, gen))?)?;
+
             uncompacted += load(gen, &mut reader, &mut index)?;
             readers.insert(gen, reader);
         }
 
+        // unwrap_or: returned the contained Some value or a provided default value
         let current_gen = gen_list.last().unwrap_or(&0) + 1;
         let writer = new_log_file(&path, current_gen, &mut readers)?;
 
@@ -111,6 +114,8 @@ impl KvStore {
     pub fn set(&mut self, key: String, value: String) -> Result<()> {
         let cmd = Command::set(key, value);
         let pos = self.writer.pos;
+
+        // Serialize the given data structure as JSON into the I/O stream
         serde_json::to_writer(&mut self.writer, &cmd)?;
         self.writer.flush()?;
 
@@ -185,22 +190,33 @@ impl KvStore {
         // increase current gen by 2. current_gen + 1 is for the compaction file
         let compaction_gen = self.current_gen + 1;
         self.current_gen += 2;
+
+        // self.writer point to the 3.log
         self.writer = self.new_log_file(self.current_gen)?;
 
+        // this writer point to 2.log
         let mut compaction_writer = self.new_log_file(compaction_gen)?;
 
         let mut new_pos = 0; // pos in the new log file
-        for cmd_pos in &mut self.index.values_mut() {
-            let reader = self
+
+
+        // what is the order of this mutable iterator
+        for cmd_pos in &mut self.index.values_mut() {// get mutable iterator over the values of map
+            let reader = self// get reader of each gen.log file
                 .readers
+                // return a mutable reference to the value for corresponding to the key
                 .get_mut(&cmd_pos.gen)
                 .expect("Cannot find log reader");
 
             if reader.pos != cmd_pos.pos {
-                reader.seek(SeekFrom::Start(cmd_pos.pos))?;
+                reader.seek(SeekFrom::Start(cmd_pos.pos))?;// seek to an offset, in bytes, in a stream
             }
 
+            // This function returns a new instance of Read which will read at most limit bytes,
+            // after which it will always return EOF
             let mut entry_reader = reader.take(cmd_pos.len);
+
+            // copy the entire contents of a reader into a writer
             let len = io::copy(&mut entry_reader, &mut compaction_writer)?;
             *cmd_pos = (compaction_gen, new_pos..new_pos + len).into();
             new_pos += len;
@@ -244,6 +260,8 @@ fn new_log_file(
     let path = log_path(&path, gen);
 
     let writer = BufWriterWithPos::new(
+        // Options and flags which can be used to configure how a file is opened.
+        // Opening a file for both reading and writing, as well as creating if if it doesn't exist
         OpenOptions::new()
             .create(true)
             .write(true)
@@ -251,8 +269,10 @@ fn new_log_file(
             .open(&path)?,
     )?;
 
+    // add reader into map
     readers.insert(gen, BufReaderWithPos::new(File::open(&path)?)?);
 
+    // return the writer
     Ok(writer)
 }
 
@@ -292,13 +312,25 @@ fn load(
 ) -> Result<u64> {
     // To make sure we read from the beginning of the file.
     let mut pos = reader.seek(SeekFrom::Start(0))?;
-    let mut stream = Deserializer::from_reader(reader).into_iter::<Command>();
+
+
+    let mut stream =
+        // create a json deserializer from an io::Reader
+        Deserializer::from_reader(reader)
+
+            // Turns a json deserializer into an iterator over value of type T
+        .into_iter::<Command>();
+
+
     let mut uncompacted = 0; // number of bytes that can be saved after a compaction
 
     while let Some(cmd) = stream.next() {
         let new_pos = stream.byte_offset() as u64;
         match cmd? {
             Command::Set { key, .. } => {
+
+                // If the map did not have this key present, None is returned
+                // If the map did have this key present, the value is updated and the old value is returned.
                 if let Some(old_cmd) = index.insert(key, (gen, pos..new_pos).into()) {
                     uncompacted += old_cmd.len;
                 }
@@ -362,8 +394,12 @@ struct BufReaderWithPos<R: Read + Seek> {
     pos: u64,
 }
 
+
+// File has impl the Read and Seek trait
 impl<R: Read + Seek> BufReaderWithPos<R> {
     fn new(mut inner: R) -> Result<Self> {
+
+        // seek to an offset, in bytes, in a stream
         let pos = inner.seek(SeekFrom::Current(0))?;
 
         Ok(BufReaderWithPos {
@@ -490,4 +526,33 @@ fn test_current_dir() -> crate::Result<()> {
     println!();
 
     Ok(())
+}
+
+
+#[test]
+fn test_load() -> Result<()> {
+    let path = current_dir()?;
+    let gen = 1;
+    let mut reader = BufReaderWithPos::new(File::open(log_path(&path, gen))?)?;
+
+    let mut deserializer = Deserializer::from_reader(reader);
+
+    let mut stream = deserializer.into_iter::<Command>();
+
+    while let Some(cmd) = stream.next() {
+        let pos = stream.byte_offset() as u64;
+        println!("{:?}", cmd?);
+        println!();
+    }
+
+
+    Ok(())
+
+}
+
+
+
+#[test]
+fn test_compact_log_file() {
+
 }
