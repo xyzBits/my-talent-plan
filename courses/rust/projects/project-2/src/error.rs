@@ -1,5 +1,5 @@
 use std::io;
-use std::io::Error;
+use std::io::{Error, ErrorKind};
 
 use failure::Fail;
 
@@ -76,4 +76,22 @@ mod error_test {
         let number: Number = x.into();
         println!("{:?}", number);
     }
+}
+
+#[test]
+fn test_kvs_error_from() {
+    let addr_in_use_error = Error::new(ErrorKind::AddrInUse, "addr in use");
+
+    let kvs_error = KvsError::from(addr_in_use_error);
+
+    println!("{}", kvs_error);
+}
+
+#[test]
+fn test_kvs_error_into() {
+    let invalid_data_error = Error::new(ErrorKind::InvalidData, "invalid data");
+
+    let kvs_error: KvsError = invalid_data_error.into();
+
+    println!("{}", kvs_error);
 }

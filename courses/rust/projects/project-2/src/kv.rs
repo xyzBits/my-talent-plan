@@ -6,7 +6,6 @@ use std::fs::{File, OpenOptions};
 use std::io::{BufReader, BufWriter, Read, Seek, SeekFrom, Write};
 use std::ops::Range;
 use std::path::{Path, PathBuf};
-use std::ptr::read;
 
 use serde::{Deserialize, Serialize};
 use serde_json::Deserializer;
@@ -281,9 +280,11 @@ fn new_log_file(
 pub fn sorted_gen_list(path: &Path) -> Result<Vec<u64>> {
 
     // return an iterator over the entry within a directory
-    let mut gen_list = fs::read_dir(&path)?
+    // let mut gen_list = fs::read_dir(&path)?
+    let mut gen_list = fs::read_dir(path)?
 
-        .flat_map(|res| -> Result<_> { Ok(res?.path()) })
+        .flat_map(|res| -> Result<PathBuf> { Ok(res?.path()) })
+        // .flat_map(|res| Ok::<PathBuf, KvsError>(res?.path()))
 
         // single expression, you do not need to write -> {} can be ignored
         .filter(|path| path.is_file() && path.extension() == Some("log".as_ref()))
@@ -320,7 +321,7 @@ fn load(
         Deserializer::from_reader(reader)
 
             // Turns a json deserializer into an iterator over value of type T
-        .into_iter::<Command>();
+            .into_iter::<Command>();
 
 
     let mut uncompacted = 0; // number of bytes that can be saved after a compaction
@@ -372,6 +373,7 @@ impl Command {
 }
 
 /// Represents the position and length of a json-serialized command in the log
+#[derive(Debug)]
 struct CommandPos {
     // {"Set":{"key":"key1","value":"value1"}}, if this is first command in 1.log,
     // gen = 1, pos = 0, len = 39
@@ -548,14 +550,11 @@ fn test_load() -> Result<()> {
 
 
     Ok(())
-
 }
 
 
-
 #[test]
-fn test_compact_log_file() -> Result<()>{
-
+fn test_compact_log_file() -> Result<()> {
     let mut current_gen = 1;
 
     let compaction_gen = current_gen + 1;
@@ -571,7 +570,7 @@ fn test_compact_log_file() -> Result<()>{
 
     let mut reader = BufReaderWithPos::new(File::open(log_path(&path, 1))?)?;
 
-    load(1, &mut reader, &mut index )?;
+    load(1, &mut reader, &mut index)?;
 
 
     let mut compaction_writer = new_log_file(&path, compaction_gen, &mut readers)?;
@@ -592,13 +591,30 @@ fn test_compact_log_file() -> Result<()>{
 
         *cmd_pos = (compaction_gen, new_pos..new_pos + len).into();
         new_pos += len;
-
     }
 
     compaction_writer.flush()?;
 
 
-
     Ok(())
+}
 
+
+#[test]
+fn test_command_pos_from() {
+
+    // (gen, pos..new_pos).into()
+    let command_pos = CommandPos::from((3, Range { start: 1, end: 10 }));
+
+    println!("{:?}", command_pos);
+}
+
+#[test]
+fn test_command_pos_into() {
+    let command_pos: CommandPos = (2, Range { start: 0, end: 7 }).into();
+
+    println!("{:?}", command_pos);
+
+    let command_pos: CommandPos = (3, 34..67).into();
+    println!("{:?}", command_pos);
 }

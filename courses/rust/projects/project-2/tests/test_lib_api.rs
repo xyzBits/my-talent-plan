@@ -1,18 +1,13 @@
-use std::collections::{BTreeMap, HashMap};
+use std::{fs, io};
+use std::collections::BTreeMap;
 use std::env::current_dir;
 use std::ffi::OsStr;
 use std::fmt::Display;
-use std::{fs, io};
 use std::fs::{File, OpenOptions};
 use std::io::{BufRead, BufReader, Read, Seek, SeekFrom};
 use std::path::PathBuf;
-use std::process::Command;
 
-use serde_json::Deserializer;
 // use tempfile::TempDir;
-
-use kvs::{ Result};
-
 
 fn hello(input: impl Into<String> + Display) {
     println!("input = {}", input);
@@ -35,9 +30,6 @@ fn test_into_path_buf() {
 }
 
 fn open_path(path: impl Into<PathBuf>) {}
-
-
-
 
 
 #[test]
@@ -94,7 +86,7 @@ fn test_path_join() -> io::Result<()> {
 
 
 #[test]
-fn test_buffer_reader() -> std::io::Result<()>{
+fn test_buffer_reader() -> std::io::Result<()> {
     let file = File::open("../Cargo.toml")?;
 
     let mut reader = BufReader::new(file);
@@ -106,7 +98,6 @@ fn test_buffer_reader() -> std::io::Result<()>{
     println!("{}", len);
 
     Ok(())
-
 }
 
 
@@ -140,10 +131,6 @@ fn test_i32_into() {
 }
 
 
-
-
-
-
 #[test]
 fn test_btree_map() {
     let mut map = BTreeMap::new();
@@ -154,8 +141,6 @@ fn test_btree_map() {
         println!("{}", value);
         value.push_str("!");
     }
-
-
 }
 
 
@@ -183,7 +168,6 @@ fn test_seek_and_take() -> std::io::Result<()> {
 }
 
 
-
 #[test]
 fn test_range() {
     let range = (1..4);
@@ -194,6 +178,46 @@ fn test_range() {
 // test all the api used in this crate
 
 
+#[test]
+fn test_dir_path_use_for() -> std::io::Result<()> {
+    let path_buf = current_dir()?;
+    let read_dir = fs::read_dir(&path_buf)?;
+
+
+    for entry in read_dir {
+        let entry = entry?;
+        let path_buf = entry.path();
+        if path_buf.is_file() {
+            println!("this is a file {}", path_buf.file_name().unwrap().to_str().unwrap());
+        } else if path_buf.is_dir() {
+            println!("this is a dir {}", path_buf.file_name().unwrap().to_str().unwrap());
+        }
+    }
+
+
+    Ok(())
+}
+
+use kvs::{KvsError, Result};
+
+#[test]
+fn test_read_dir_result() -> io::Result<()> {
+    let path_buf = current_dir()?;
+    let read_dir = fs::read_dir(&path_buf)?;
+
+
+
+    for entry in read_dir {
+        let res: Result<PathBuf> = Ok(entry?.path());
+
+
+
+    }
+
+
+    Ok(())
+
+}
 
 
 
