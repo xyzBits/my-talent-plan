@@ -4,7 +4,7 @@ use std::ffi::OsStr;
 use std::fmt::Display;
 use std::{fs, io};
 use std::fs::{File, OpenOptions};
-use std::io::{BufRead, BufReader, Seek, SeekFrom};
+use std::io::{BufRead, BufReader, Read, Seek, SeekFrom};
 use std::path::PathBuf;
 use std::process::Command;
 
@@ -13,7 +13,6 @@ use serde_json::Deserializer;
 
 use kvs::{ Result};
 
-fn main() {}
 
 fn hello(input: impl Into<String> + Display) {
     println!("input = {}", input);
@@ -28,7 +27,7 @@ fn test_hello() {
 #[test]
 fn test_into_path_buf() {
     let mut path_buf = PathBuf::new();
-    path_buf.push(".");
+    path_buf.push("..");
 
     // let temp_dir = TempDir::new().expect("unable to create temporary working directory");
 
@@ -71,7 +70,7 @@ fn test_as_ref() {
 
 #[test]
 fn test_seek_trait() -> io::Result<()> {
-    let mut file = File::open("Cargo.toml")?;
+    let mut file = File::open("../Cargo.toml")?;
 
     // mov ethe cursor 42 bytes from the start of the file
     let result = file.seek(SeekFrom::Start(42))?;
@@ -96,7 +95,7 @@ fn test_path_join() -> io::Result<()> {
 
 #[test]
 fn test_buffer_reader() -> std::io::Result<()>{
-    let file = File::open("Cargo.toml")?;
+    let file = File::open("../Cargo.toml")?;
 
     let mut reader = BufReader::new(file);
 
@@ -127,7 +126,7 @@ fn test_open_option() -> std::io::Result<()> {
         .read(true)
         .write(true)
         .create(true)
-        .open("Cargo.toml")?;
+        .open("../Cargo.toml")?;
 
     Ok(())
 }
@@ -160,10 +159,39 @@ fn test_btree_map() {
 }
 
 
+#[test]
+fn test_seek_and_take() -> std::io::Result<()> {
+    let file = OpenOptions::new()
+        .read(true)
+        .create(true)
+        .write(true)
+        .open("hello.log")?;
+
+
+    let mut reader = BufReader::new(file);
+
+    let len = reader.seek(SeekFrom::Current(6))?;
+
+    let mut stream = reader.take(5);
+
+    let mut hello = String::new();
+    let len = stream.read_line(&mut hello)?;
+
+    println!("{}", hello);
+
+    Ok(())
+}
 
 
 
+#[test]
+fn test_range() {
+    let range = (1..4);
+    let sum: i32 = range.sum();
+    println!("{:?}", sum);
+}
 
+// test all the api used in this crate
 
 
 

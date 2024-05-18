@@ -6,6 +6,7 @@ use std::fs::{File, OpenOptions};
 use std::io::{BufReader, BufWriter, Read, Seek, SeekFrom, Write};
 use std::ops::Range;
 use std::path::{Path, PathBuf};
+use std::ptr::read;
 
 use serde::{Deserialize, Serialize};
 use serde_json::Deserializer;
@@ -553,6 +554,51 @@ fn test_load() -> Result<()> {
 
 
 #[test]
-fn test_compact_log_file() {
+fn test_compact_log_file() -> Result<()>{
+
+    let mut current_gen = 1;
+
+    let compaction_gen = current_gen + 1;
+
+    current_gen += 2;
+
+    let mut readers: HashMap<u64, BufReaderWithPos<File>> = HashMap::new();
+
+    let mut index = BTreeMap::<String, CommandPos>::new();
+
+    let path = current_dir()?;
+
+
+    let mut reader = BufReaderWithPos::new(File::open(log_path(&path, 1))?)?;
+
+    load(1, &mut reader, &mut index )?;
+
+
+    let mut compaction_writer = new_log_file(&path, compaction_gen, &mut readers)?;
+
+    let mut new_pos = 0;
+
+
+    for cmd_pos in &mut index.values_mut() {
+        let reader = readers.get_mut(&cmd_pos.gen).expect("Cannot find log reader");
+
+        if reader.pos != cmd_pos.pos {// let reader seek offset to the cmd
+            reader.seek(SeekFrom::Start(cmd_pos.pos))?;
+        }
+
+        let mut entry_reader = reader.take(cmd_pos.len);
+
+        let len = io::copy(&mut entry_reader, &mut compaction_writer)?;
+
+        *cmd_pos = (compaction_gen, new_pos..new_pos + len).into();
+        new_pos += len;
+
+    }
+
+    compaction_writer.flush()?;
+
+
+
+    Ok(())
 
 }
