@@ -278,11 +278,20 @@ fn new_log_file(
 
 /// Returns sorted generation numbers in the given directory
 pub fn sorted_gen_list(path: &Path) -> Result<Vec<u64>> {
+    let filter = fs::read_dir(path)?
+        // / impl Iterator<Item=Result<PathBuf>>
+        .map(|res| -> Result<PathBuf>{ Ok(res?.path()) })
+        .filter(|_x| { true });
 
     // return an iterator over the entry within a directory
     // let mut gen_list = fs::read_dir(&path)?
     let mut gen_list = fs::read_dir(path)?
+        // .map(|res| {res?.path()})
+        // .map(|res| -> Result<PathBuf>{ Ok(res?.path())})
 
+        // .flat_map(|res| -> Result<_> { Ok(res?.path()) })
+
+        // / impl Iterator<Item=PathBur>
         .flat_map(|res| -> Result<PathBuf> { Ok(res?.path()) })
         // .flat_map(|res| Ok::<PathBuf, KvsError>(res?.path()))
 

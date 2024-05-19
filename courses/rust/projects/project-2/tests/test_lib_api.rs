@@ -32,6 +32,16 @@ fn test_into_path_buf() {
 fn open_path(path: impl Into<PathBuf>) {}
 
 
+/// Creates an iterator that works like map, but flattens nested structure.
+///
+/// The `map` adapter is very useful, but only when the closure argument produces values.
+/// If it produces an iterator instead, there's an extra layer of indirection.
+/// flat_map() will remove this extra layer on its own.
+///
+/// You can think of flat_map as the semantic equivalent of map ping, and then flattening as in map(f).flatten().
+///
+/// Another way of thinking about flat_map(): map's closure return one item for each element, and flat_map()'s closure
+/// returns an iterator for each element.
 #[test]
 fn test_flat_map() {
     let nested_numbers = vec![vec![1, 2, 3], vec![4, 5]];
@@ -220,12 +230,36 @@ fn test_read_dir_result() -> io::Result<()> {
 }
 
 
+#[test]
+fn test_closure_specify_return_type() {
+    /// In Rust, -> syntax in closures is used to specify the return type.
+    /// When defining a closure, you can explicitly declare the input and output types
+    /// using the |parameter| -> return_type {body} syntax.
+    ///
+    /// For example, in closure |x: i32| -> i32 { x + 1},
+    /// the -> i32 specifies that the closure will return an i32 type.
+    /// This can be helpful for explicitly stating the expected return type
+    /// of the closure, especially in cases where it my not be inferred by the compiler.
+    ///
+    /// However, in many cases, Rust's type inference system can automatically determine the return type
+    /// of the closure based on the body of the closure, so explicitly specifying the return type is
+    /// not always necessary
+    let f1 = |x: i32| -> String {x.to_string()};
 
 
 
+}
 
 
 
+#[test]
+fn test_map() {
+    let data = vec![1, 2, 3, 4];
+    let result = data
+        .iter()
+        .map(|item| *item * 2)
+        .collect::<Vec<_>>();
+}
 
 
 
