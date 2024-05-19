@@ -1,4 +1,3 @@
-use std::{fs, io};
 use std::collections::BTreeMap;
 use std::env::current_dir;
 use std::ffi::OsStr;
@@ -6,6 +5,7 @@ use std::fmt::Display;
 use std::fs::{File, OpenOptions};
 use std::io::{BufRead, BufReader, Read, Seek, SeekFrom};
 use std::path::PathBuf;
+use std::{fs, io};
 
 // use tempfile::TempDir;
 
@@ -31,7 +31,6 @@ fn test_into_path_buf() {
 
 fn open_path(path: impl Into<PathBuf>) {}
 
-
 /// Creates an iterator that works like map, but flattens nested structure.
 ///
 /// The `map` adapter is very useful, but only when the closure argument produces values.
@@ -51,12 +50,14 @@ fn test_flat_map() {
         .iter()
         .map(|inner_list| {
             inner_list.iter().map(|num| *num * 2) // Double each number in the inner list
-        }).collect();  // Collects as a vector of vectors
+        })
+        .collect(); // Collects as a vector of vectors
 
-// Using flat_map (flattens and transforms)
-    let flat_numbers = nested_numbers.iter()
+    // Using flat_map (flattens and transforms)
+    let flat_numbers = nested_numbers
+        .iter()
         .flat_map(|inner_list| inner_list.iter().map(|num| num * 2))
-        .collect::<Vec<i32>>();  // Collects as a flat vector of numbers
+        .collect::<Vec<i32>>(); // Collects as a flat vector of numbers
 
     println!("Mapped (not flattened): {:?}", mapped_numbers);
     println!("Flattened: {:?}", flat_numbers);
@@ -69,7 +70,6 @@ fn test_as_ref() {
     let hello_ref: &OsStr = hello.as_ref();
 }
 
-
 #[test]
 fn test_seek_trait() -> io::Result<()> {
     let mut file = File::open("../Cargo.toml")?;
@@ -78,7 +78,6 @@ fn test_seek_trait() -> io::Result<()> {
     let result = file.seek(SeekFrom::Start(42))?;
 
     println!("{}", result);
-
 
     Ok(())
 }
@@ -93,7 +92,6 @@ fn test_path_join() -> io::Result<()> {
 
     Ok(())
 }
-
 
 #[test]
 fn test_buffer_reader() -> std::io::Result<()> {
@@ -110,7 +108,6 @@ fn test_buffer_reader() -> std::io::Result<()> {
     Ok(())
 }
 
-
 #[test]
 fn test_vec_last_unwrap_or() {
     let v: Vec<i32> = vec![];
@@ -119,7 +116,6 @@ fn test_vec_last_unwrap_or() {
 
     println!("{}", last);
 }
-
 
 #[test]
 fn test_open_option() -> std::io::Result<()> {
@@ -132,7 +128,6 @@ fn test_open_option() -> std::io::Result<()> {
     Ok(())
 }
 
-
 #[test]
 fn test_i32_into() {
     let x = 34_i16;
@@ -140,19 +135,18 @@ fn test_i32_into() {
     let x1: i32 = x.into();
 }
 
-
 #[test]
 fn test_btree_map() {
     let mut map = BTreeMap::new();
     map.insert(3, "hello".to_string());
     map.insert(2, "world".to_string());
 
-    for value in map.values_mut() {// iterate order is the order of key
+    for value in map.values_mut() {
+        // iterate order is the order of key
         println!("{}", value);
         value.push_str("!");
     }
 }
-
 
 #[test]
 fn test_seek_and_take() -> std::io::Result<()> {
@@ -161,7 +155,6 @@ fn test_seek_and_take() -> std::io::Result<()> {
         .create(true)
         .write(true)
         .open("hello.log")?;
-
 
     let mut reader = BufReader::new(file);
 
@@ -177,7 +170,6 @@ fn test_seek_and_take() -> std::io::Result<()> {
     Ok(())
 }
 
-
 #[test]
 fn test_range() {
     let range = (1..4);
@@ -187,23 +179,26 @@ fn test_range() {
 
 // test all the api used in this crate
 
-
 #[test]
 fn test_dir_path_use_for() -> std::io::Result<()> {
     let path_buf = current_dir()?;
     let read_dir = fs::read_dir(&path_buf)?;
 
-
     for entry in read_dir {
         let entry = entry?;
         let path_buf = entry.path();
         if path_buf.is_file() {
-            println!("this is a file {}", path_buf.file_name().unwrap().to_str().unwrap());
+            println!(
+                "this is a file {}",
+                path_buf.file_name().unwrap().to_str().unwrap()
+            );
         } else if path_buf.is_dir() {
-            println!("this is a dir {}", path_buf.file_name().unwrap().to_str().unwrap());
+            println!(
+                "this is a dir {}",
+                path_buf.file_name().unwrap().to_str().unwrap()
+            );
         }
     }
-
 
     Ok(())
 }
@@ -215,20 +210,12 @@ fn test_read_dir_result() -> io::Result<()> {
     let path_buf = current_dir()?;
     let read_dir = fs::read_dir(&path_buf)?;
 
-
-
     for entry in read_dir {
         let res: Result<PathBuf> = Ok(entry?.path());
-
-
-
     }
 
-
     Ok(())
-
 }
-
 
 #[test]
 fn test_closure_specify_return_type() {
@@ -244,32 +231,11 @@ fn test_closure_specify_return_type() {
     /// However, in many cases, Rust's type inference system can automatically determine the return type
     /// of the closure based on the body of the closure, so explicitly specifying the return type is
     /// not always necessary
-    let f1 = |x: i32| -> String {x.to_string()};
-
-
-
+    let f1 = |x: i32| -> String { x.to_string() };
 }
-
-
 
 #[test]
 fn test_map() {
     let data = vec![1, 2, 3, 4];
-    let result = data
-        .iter()
-        .map(|item| *item * 2)
-        .collect::<Vec<_>>();
+    let result = data.iter().map(|item| *item * 2).collect::<Vec<_>>();
 }
-
-
-
-
-
-
-
-
-
-
-
-
-

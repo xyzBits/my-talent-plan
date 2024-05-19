@@ -1,4 +1,3 @@
-use std::{fs, io};
 use std::collections::{BTreeMap, HashMap};
 use std::env::current_dir;
 use std::ffi::OsStr;
@@ -6,6 +5,7 @@ use std::fs::{File, OpenOptions};
 use std::io::{BufReader, BufWriter, Read, Seek, SeekFrom, Write};
 use std::ops::Range;
 use std::path::{Path, PathBuf};
+use std::{fs, io};
 
 use serde::{Deserialize, Serialize};
 use serde_json::Deserializer;
@@ -67,10 +67,11 @@ impl KvStore {
     /// It propagates I/O or deserialization errors during the log replay.
     // pub fn open(path: impl Into<PathBuf>) -> Result<KvStore>  {
     pub fn open<T>(path: T) -> Result<KvStore>
-        where T: Into<PathBuf> {
+    where
+        T: Into<PathBuf>,
+    {
         // In Rust, Impl Trait in an argument position is syntactic sugar for a generic type parameter like <T: Trait>.
         // However, the type is anonymous and doesn't appear in the GenericParam list.
-
 
         let path = path.into();
 
@@ -199,17 +200,17 @@ impl KvStore {
 
         let mut new_pos = 0; // pos in the new log file
 
-
         // what is the order of this mutable iterator
-        for cmd_pos in &mut self.index.values_mut() {// get mutable iterator over the values of map
-            let reader = self// get reader of each gen.log file
+        for cmd_pos in &mut self.index.values_mut() {
+            // get mutable iterator over the values of map
+            let reader = self // get reader of each gen.log file
                 .readers
                 // return a mutable reference to the value for corresponding to the key
                 .get_mut(&cmd_pos.gen)
                 .expect("Cannot find log reader");
 
             if reader.pos != cmd_pos.pos {
-                reader.seek(SeekFrom::Start(cmd_pos.pos))?;// seek to an offset, in bytes, in a stream
+                reader.seek(SeekFrom::Start(cmd_pos.pos))?; // seek to an offset, in bytes, in a stream
             }
 
             // This function returns a new instance of Read which will read at most limit bytes,
@@ -280,25 +281,20 @@ fn new_log_file(
 pub fn sorted_gen_list(path: &Path) -> Result<Vec<u64>> {
     let filter = fs::read_dir(path)?
         // / impl Iterator<Item=Result<PathBuf>>
-        .map(|res| -> Result<PathBuf>{ Ok(res?.path()) })
-        .filter(|_x| { true });
+        .map(|res| -> Result<PathBuf> { Ok(res?.path()) })
+        .filter(|_x| true);
 
     // return an iterator over the entry within a directory
     // let mut gen_list = fs::read_dir(&path)?
     let mut gen_list = fs::read_dir(path)?
         // .map(|res| {res?.path()})
         // .map(|res| -> Result<PathBuf>{ Ok(res?.path())})
-
         // .flat_map(|res| -> Result<_> { Ok(res?.path()) })
-
         // / impl Iterator<Item=PathBur>
         .flat_map(|res| -> Result<PathBuf> { Ok(res?.path()) })
         // .flat_map(|res| Ok::<PathBuf, KvsError>(res?.path()))
-
         // single expression, you do not need to write -> {} can be ignored
         .filter(|path| path.is_file() && path.extension() == Some("log".as_ref()))
-
-
         .flat_map(|path| {
             path.file_name()
                 .and_then(OsStr::to_str)
@@ -324,7 +320,6 @@ fn load(
     // To make sure we read from the beginning of the file.
     let mut pos = reader.seek(SeekFrom::Start(0))?;
 
-
     let mut stream =
         // create a json deserializer from an io::Reader
         Deserializer::from_reader(reader)
@@ -332,14 +327,12 @@ fn load(
             // Turns a json deserializer into an iterator over value of type T
             .into_iter::<Command>();
 
-
     let mut uncompacted = 0; // number of bytes that can be saved after a compaction
 
     while let Some(cmd) = stream.next() {
         let new_pos = stream.byte_offset() as u64;
         match cmd? {
             Command::Set { key, .. } => {
-
                 // If the map did not have this key present, None is returned
                 // If the map did have this key present, the value is updated and the old value is returned.
                 if let Some(old_cmd) = index.insert(key, (gen, pos..new_pos).into()) {
@@ -386,9 +379,9 @@ impl Command {
 struct CommandPos {
     // {"Set":{"key":"key1","value":"value1"}}, if this is first command in 1.log,
     // gen = 1, pos = 0, len = 39
-    gen: u64,// prefix of the gen.log file
-    pos: u64,// start position of command
-    len: u64,// the length of the serialized command bytes
+    gen: u64, // prefix of the gen.log file
+    pos: u64, // start position of command
+    len: u64, // the length of the serialized command bytes
 }
 
 impl From<(u64, Range<u64>)> for CommandPos {
@@ -406,11 +399,9 @@ struct BufReaderWithPos<R: Read + Seek> {
     pos: u64,
 }
 
-
 // File has impl the Read and Seek trait
 impl<R: Read + Seek> BufReaderWithPos<R> {
     fn new(mut inner: R) -> Result<Self> {
-
         // seek to an offset, in bytes, in a stream
         let pos = inner.seek(SeekFrom::Current(0))?;
 
@@ -471,7 +462,6 @@ impl<W: Write + Seek> Seek for BufWriterWithPos<W> {
     }
 }
 
-
 #[test]
 fn test_current_dir() -> crate::Result<()> {
     let current_dir = current_dir();
@@ -480,16 +470,12 @@ fn test_current_dir() -> crate::Result<()> {
 
     fs::create_dir_all(&path)?;
 
-    let read_dir = fs::read_dir(&path)?;// iterator
+    let read_dir = fs::read_dir(&path)?; // iterator
 
-
-    let step_one
-        = read_dir.flat_map(|res| -> crate::Result<_> { Ok(res?.path()) });
-
+    let step_one = read_dir.flat_map(|res| -> crate::Result<_> { Ok(res?.path()) });
 
     let step_two =
         step_one.filter(|path| path.is_file() && path.extension() == Some("log".as_ref()));
-
 
     let step_three = step_two.flat_map(|path| {
         path.file_name()
@@ -498,9 +484,7 @@ fn test_current_dir() -> crate::Result<()> {
             .map(str::parse::<u64>)
     });
 
-    let mut gen_list = step_three
-        .flatten()
-        .collect::<Vec<u64>>();
+    let mut gen_list = step_three.flatten().collect::<Vec<u64>>();
 
     gen_list.sort_unstable();
 
@@ -516,8 +500,7 @@ fn test_current_dir() -> crate::Result<()> {
 
     let mut pos = (&mut reader).seek(SeekFrom::Start(0))?;
 
-    let mut stream =
-        Deserializer::from_reader(&mut reader).into_iter::<Command>();
+    let mut stream = Deserializer::from_reader(&mut reader).into_iter::<Command>();
 
     let mut uncompacted = 0;
 
@@ -534,12 +517,10 @@ fn test_current_dir() -> crate::Result<()> {
         pos = new_pos;
     }
 
-
     println!();
 
     Ok(())
 }
-
 
 #[test]
 fn test_load() -> Result<()> {
@@ -557,10 +538,8 @@ fn test_load() -> Result<()> {
         println!();
     }
 
-
     Ok(())
 }
-
 
 #[test]
 fn test_compact_log_file() -> Result<()> {
@@ -576,21 +555,21 @@ fn test_compact_log_file() -> Result<()> {
 
     let path = current_dir()?;
 
-
     let mut reader = BufReaderWithPos::new(File::open(log_path(&path, 1))?)?;
 
     load(1, &mut reader, &mut index)?;
-
 
     let mut compaction_writer = new_log_file(&path, compaction_gen, &mut readers)?;
 
     let mut new_pos = 0;
 
-
     for cmd_pos in &mut index.values_mut() {
-        let reader = readers.get_mut(&cmd_pos.gen).expect("Cannot find log reader");
+        let reader = readers
+            .get_mut(&cmd_pos.gen)
+            .expect("Cannot find log reader");
 
-        if reader.pos != cmd_pos.pos {// let reader seek offset to the cmd
+        if reader.pos != cmd_pos.pos {
+            // let reader seek offset to the cmd
             reader.seek(SeekFrom::Start(cmd_pos.pos))?;
         }
 
@@ -604,14 +583,11 @@ fn test_compact_log_file() -> Result<()> {
 
     compaction_writer.flush()?;
 
-
     Ok(())
 }
 
-
 #[test]
 fn test_command_pos_from() {
-
     // (gen, pos..new_pos).into()
     let command_pos = CommandPos::from((3, Range { start: 1, end: 10 }));
 

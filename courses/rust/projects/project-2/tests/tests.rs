@@ -1,8 +1,8 @@
-use std::path::PathBuf;
 use assert_cmd::prelude::*;
 use kvs::{KvStore, Result};
 use predicates::ord::eq;
 use predicates::str::{contains, is_empty, PredicateStrExt};
+use std::path::PathBuf;
 use std::process::Command;
 use tempfile::TempDir;
 use walkdir::WalkDir;
@@ -11,10 +11,7 @@ use walkdir::WalkDir;
 #[test]
 fn cli_no_args() {
     let result = Command::cargo_bin("kvs");
-    result
-        .unwrap()
-        .assert()
-        .failure();
+    result.unwrap().assert().failure();
 }
 
 // `kvs -V` should print the version
