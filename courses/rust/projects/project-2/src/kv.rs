@@ -1,3 +1,4 @@
+use std::{fs, io};
 use std::collections::{BTreeMap, HashMap};
 use std::env::current_dir;
 use std::ffi::OsStr;
@@ -5,7 +6,6 @@ use std::fs::{File, OpenOptions};
 use std::io::{BufReader, BufWriter, Read, Seek, SeekFrom, Write};
 use std::ops::Range;
 use std::path::{Path, PathBuf};
-use std::{fs, io};
 
 use serde::{Deserialize, Serialize};
 use serde_json::Deserializer;
@@ -67,8 +67,8 @@ impl KvStore {
     /// It propagates I/O or deserialization errors during the log replay.
     // pub fn open(path: impl Into<PathBuf>) -> Result<KvStore>  {
     pub fn open<T>(path: T) -> Result<KvStore>
-    where
-        T: Into<PathBuf>,
+        where
+            T: Into<PathBuf>,
     {
         // In Rust, Impl Trait in an argument position is syntactic sugar for a generic type parameter like <T: Trait>.
         // However, the type is anonymous and doesn't appear in the GenericParam list.
@@ -278,7 +278,7 @@ fn new_log_file(
 }
 
 /// Returns sorted generation numbers in the given directory
-pub fn sorted_gen_list(path: &Path) -> Result<Vec<u64>> {
+fn sorted_gen_list(path: &Path) -> Result<Vec<u64>> {
     let filter = fs::read_dir(path)?
         // / impl Iterator<Item=Result<PathBuf>>
         .map(|res| -> Result<PathBuf> { Ok(res?.path()) })
@@ -299,6 +299,7 @@ pub fn sorted_gen_list(path: &Path) -> Result<Vec<u64>> {
             path.file_name()
                 .and_then(OsStr::to_str)
                 .map(|s| s.trim_end_matches(".log"))
+                // .map(|item| str::parse::<u64>(item))
                 .map(str::parse::<u64>)
         })
         .flatten()

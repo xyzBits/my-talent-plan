@@ -239,3 +239,16 @@ fn test_map() {
     let data = vec![1, 2, 3, 4];
     let result = data.iter().map(|item| *item * 2).collect::<Vec<_>>();
 }
+
+
+#[test]
+fn test_string_slice_as_ref() {
+    let hello = "hello";
+    // as_ref: convert this type into a shared reference of the (usually inferred) input type
+
+    // The as_ref function in Rust is a method that is used to convert a value into
+    // a reference of a different type.
+    let hello_as_ref: &OsStr = hello.as_ref();
+    //  ---- type must be known at this point
+    println!("{:?}", hello_as_ref);
+}
