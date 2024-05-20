@@ -35,7 +35,6 @@ pub enum KvsError {
     /// Error with a string message
     #[fail(display = "{}", _0)]
     StringError(String),
-
 }
 
 impl From<io::Error> for KvsError {
@@ -50,13 +49,11 @@ impl From<serde_json::Error> for KvsError {
     }
 }
 
-
 impl From<FromUtf8Error> for KvsError {
     fn from(value: FromUtf8Error) -> Self {
         KvsError::Utf8(value)
     }
 }
-
 
 impl From<sled::Error> for KvsError {
     fn from(value: sled::Error) -> Self {
@@ -68,14 +65,4 @@ impl From<sled::Error> for KvsError {
 pub type Result<T> = std::result::Result<T, KvsError>;
 
 #[test]
-fn test_cause() {
-
-}
-
-
-
-
-
-
-
-
+fn test_cause() {}
