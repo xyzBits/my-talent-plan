@@ -252,3 +252,13 @@ fn test_string_slice_as_ref() {
     //  ---- type must be known at this point
     println!("{:?}", hello_as_ref);
 }
+
+
+#[test]
+fn test_drop() {
+    let vec = vec![1, 2, 3, 4];
+
+    drop(vec);// set random value
+
+    println!();
+}

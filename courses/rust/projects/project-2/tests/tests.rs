@@ -76,6 +76,8 @@ fn cli_get_stored() -> Result<()> {
     store.set("hello".to_owned(), "world".to_owned())?;
 
     store.set("hello".to_owned(), "rust".to_owned())?;
+
+    // Dispose a value
     drop(store);
 
     Command::cargo_bin("kvs")
