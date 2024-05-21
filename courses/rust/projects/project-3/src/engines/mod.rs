@@ -1,5 +1,7 @@
 //! This module provides various key value storage engines.
 
+// import the module named Result from the current crate. The crate keyword is used
+// to refer to the current crate or package in Rust.
 use crate::Result;
 
 /// Trait for a key value storage engine.
@@ -25,5 +27,8 @@ pub trait KvsEngine {
 mod kvs;
 mod sled;
 
+// put use keyword is used to make the following item publicly available for use
+// outside of the module where it is defined
+// self reference the current module where the code is located.
 pub use self::kvs::KvStore;
 pub use self::sled::SledKvsEngine;
