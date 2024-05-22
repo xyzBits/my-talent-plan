@@ -69,10 +69,11 @@ fn main() {
 
     let res = current_engine()
         .and_then(move |curr_engine| {
-            if opt.engine.is_none() {
+            if opt.engine.is_none() {// if first startup, will execute this block
                 opt.engine = curr_engine;
             }
 
+            // if not startup first
             if curr_engine.is_some() && opt.engine != curr_engine {// != supported by PartialEq, Eq
                 error!("Wrong engine!");
                 exit(1);
@@ -89,6 +90,7 @@ fn main() {
 
 
 fn run(opt: Opt) -> Result<()> {
+    // Returns the contained Some value or a provided default
     let engine = opt.engine.unwrap_or(DEFAULT_ENGINE);
     info!("kvs-server {}", env!("CARGO_PKG_VERSION"));
     info!("Storage engine: {}", engine);
@@ -110,7 +112,8 @@ fn run_with_engine<E: KvsEngine>(engine: E, addr: SocketAddr) -> Result<()> {
 
 
 fn current_engine() -> Result<Option<Engine>> {
-    let engine = current_dir()?.join("engine");
+    // Returns the current working directory as a pathBuf
+    let engine = current_dir()?.join("engine");// Creates an owned pathBuf with path joined to self
     if !engine.exists() {
         return Ok(None);
     }
