@@ -50,6 +50,14 @@ impl<E: KvsEngine> KvsServer<E> {
             Deserializer::from_reader(reader)
             .into_iter::<Request>();// Turn a JSON deserializer into an iterator over values of type T
 
+        /// Defines a macro named send_resp! that serializes a Rust data structure ($resp)
+        /// into JSON format and sends it to a writer-like object.
+        /// macro_rules! introduce a new macro definition
+        /// send_resp! this is the name of macro
+        /// ($resp: expr) defines a single argument named `$resp` that can be any expression.
+        /// the curly braces {} enclose the code that will be executed when you call the macro.
+        /// `let resp = $resp;` assigns the value of the argument(`$resp`) to a new variable named `resp`
+        ///
         macro_rules! send_resp {
             ($resp: expr) => {{
                 let resp = $resp;
@@ -99,17 +107,34 @@ fn test_tcp_peer_addr() {
 use std::fs::File;
 
 #[test]
-fn test_write_trait() {
+fn test_write_trait() -> Result<()> {
     let file = File::open("hello.txt")?;
     let mut buf_writer = BufWriter::new(file);
 
     // Method `write` not found in the current scope for struct `BufWriter<File>` [E0599]
     buf_writer.write("hello world".as_bytes())?;
 
+    Ok(())
+
 }
 
 
+#[test]
+fn test_serde_json_deserialize() -> Result<()> {
+    let file = File::open("1.log")?;
+    let reader = BufReader::new(file);
+    let request_iter =
+        Deserializer::from_reader(reader).into_iter::<Request>();
 
+    for request in request_iter {
+        let request = request?;
+
+        println!("{:?}", request);
+    }
+
+    Ok(())
+
+}
 
 
 
