@@ -6,8 +6,8 @@ use serde::Deserialize;
 use serde_json::de::IoRead;
 use serde_json::Deserializer;
 
-use crate::{KvsError, Result};
 use crate::common::{GetResponse, RemoveResponse, Request, SetResponse};
+use crate::{KvsError, Result};
 
 /// Key value store client
 pub struct KvsClient {
@@ -35,7 +35,6 @@ impl KvsClient {
         })
     }
 
-
     /// Get the value of a given key from the server
     pub fn get(&mut self, key: String) -> Result<Option<String>> {
         // Serialize the given data structure as JSON into the I/O stream
@@ -44,8 +43,8 @@ impl KvsClient {
 
         let resp = GetResponse::deserialize(&mut self.reader)?;
         match resp {
-            GetResponse::Ok(value) => { Ok(value) }
-            GetResponse::Err(msg) => { Err(KvsError::StringError(msg)) }
+            GetResponse::Ok(value) => Ok(value),
+            GetResponse::Err(msg) => Err(KvsError::StringError(msg)),
         }
     }
 
@@ -56,8 +55,8 @@ impl KvsClient {
 
         let resp = SetResponse::deserialize(&mut self.reader)?;
         match resp {
-            SetResponse::Ok(_) => { Ok(()) }
-            SetResponse::Err(msg) => { Err(KvsError::StringError(msg)) }
+            SetResponse::Ok(_) => Ok(()),
+            SetResponse::Err(msg) => Err(KvsError::StringError(msg)),
         }
     }
 
@@ -67,8 +66,8 @@ impl KvsClient {
 
         let resp = RemoveResponse::deserialize(&mut self.reader)?;
         match resp {
-            RemoveResponse::Ok(_) => { Ok(()) }
-            RemoveResponse::Err(msg) => { Err(KvsError::StringError(msg)) }
+            RemoveResponse::Ok(_) => Ok(()),
+            RemoveResponse::Err(msg) => Err(KvsError::StringError(msg)),
         }
     }
 }
@@ -85,7 +84,12 @@ fn test_serde_json_write() -> Result<()> {
         .open("2.log")?;
     let mut writer = BufWriter::new(file);
 
-    serde_json::to_writer(&mut writer, &Request::Get { key: "hello".to_string() })?;
+    serde_json::to_writer(
+        &mut writer,
+        &Request::Get {
+            key: "hello".to_string(),
+        },
+    )?;
     writer.flush()?;
 
     let mut reader = BufReader::new(File::open("2.log")?);

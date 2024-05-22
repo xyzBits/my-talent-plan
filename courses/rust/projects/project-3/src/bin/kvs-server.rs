@@ -4,18 +4,16 @@ use std::net::SocketAddr;
 use std::process::exit;
 
 use clap::arg_enum;
-use log::{debug, error, info, Level, LevelFilter, log_enabled, warn};
+use log::{debug, error, info, log_enabled, warn, Level, LevelFilter};
 use structopt::StructOpt;
 
-use kvs::{KvsEngine, KvsServer, KvStore, Result, SledKvsEngine};
-
+use kvs::{KvStore, KvsEngine, KvsServer, Result, SledKvsEngine};
 
 const DEFAULT_LISTENING_ADDRESS: &str = "127.0.0.1:4000";
 const DEFAULT_ENGINE: Engine = Engine::kvs;
 
 // StructOpt: This derive comes from the structopt crate and enables paring
 // command-line arguments based on the structure's fields.
-
 
 #[derive(StructOpt, Debug)]
 // This attribute specifies the name of the program for which these arguments are intended.
@@ -38,7 +36,6 @@ struct Opt {
         raw(possible_values = "&Engine::variants()")
     )]
     engine: Option<Engine>,
-
 }
 
 // This macro is provided by the clap crate for defining enumerations that can be used as arguments for command-line tools.
@@ -67,27 +64,27 @@ fn main() {
     let mut opt = Opt::from_args();
     info!("start kvs-server opt: {:?}", opt);
 
-    let res = current_engine()
-        .and_then(move |curr_engine| {
-            if opt.engine.is_none() {// if first startup, will execute this block
-                opt.engine = curr_engine;
-            }
+    let res = current_engine().and_then(move |curr_engine| {
+        if opt.engine.is_none() {
+            // if first startup, will execute this block
+            opt.engine = curr_engine;
+        }
 
-            // if not startup first
-            if curr_engine.is_some() && opt.engine != curr_engine {// != supported by PartialEq, Eq
-                error!("Wrong engine!");
-                exit(1);
-            }
+        // if not startup first
+        if curr_engine.is_some() && opt.engine != curr_engine {
+            // != supported by PartialEq, Eq
+            error!("Wrong engine!");
+            exit(1);
+        }
 
-            run(opt)
-        });
+        run(opt)
+    });
 
     if let Err(e) = res {
         error!("{}", e);
         exit(1);
     }
 }
-
 
 fn run(opt: Opt) -> Result<()> {
     // Returns the contained Some value or a provided default
@@ -100,8 +97,8 @@ fn run(opt: Opt) -> Result<()> {
     fs::write(current_dir()?.join("engine"), format!("{}", engine))?;
 
     match engine {
-        Engine::kvs => { run_with_engine(KvStore::open(current_dir()?)?, opt.addr) }
-        Engine::sled => { run_with_engine(SledKvsEngine::new(sled::open(current_dir()?)?), opt.addr) }
+        Engine::kvs => run_with_engine(KvStore::open(current_dir()?)?, opt.addr),
+        Engine::sled => run_with_engine(SledKvsEngine::new(sled::open(current_dir()?)?), opt.addr),
     }
 }
 
@@ -110,18 +107,15 @@ fn run_with_engine<E: KvsEngine>(engine: E, addr: SocketAddr) -> Result<()> {
     server.run(addr)
 }
 
-
 fn current_engine() -> Result<Option<Engine>> {
     // Returns the current working directory as a pathBuf
-    let engine = current_dir()?.join("engine");// Creates an owned pathBuf with path joined to self
+    let engine = current_dir()?.join("engine"); // Creates an owned pathBuf with path joined to self
     if !engine.exists() {
         return Ok(None);
     }
 
     match fs::read_to_string(engine)?.parse() {
-        Ok(engine) => {
-            Ok(Some(engine))
-        }
+        Ok(engine) => Ok(Some(engine)),
 
         Err(e) => {
             warn!("The content of engine file is invalid: {}", e);
@@ -129,7 +123,6 @@ fn current_engine() -> Result<Option<Engine>> {
         }
     }
 }
-
 
 #[test]
 fn test_env_logger() {

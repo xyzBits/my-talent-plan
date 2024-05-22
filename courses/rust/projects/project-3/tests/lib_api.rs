@@ -1,8 +1,6 @@
-
-
 mod macro_tests {
-#[macro_export]
-macro_rules! my_vec {
+    #[macro_export]
+    macro_rules! my_vec {
     ($( $x: expr );* ) => {
         {
             let mut temp_vec = Vec::new();
@@ -22,5 +20,4 @@ macro_rules! my_vec {
 
         println!["{:?}", my_vec];
     }
-
 }

@@ -16,9 +16,7 @@ pub struct KvsServer<E: KvsEngine> {
 impl<E: KvsEngine> KvsServer<E> {
     /// Create a `KvsServer` with a given storage engine.
     pub fn new(engine: E) -> Self {
-        KvsServer {
-            engine,
-        }
+        KvsServer { engine }
     }
 
     pub fn run<A: ToSocketAddrs>(mut self, addr: A) -> Result<()> {
@@ -46,9 +44,7 @@ impl<E: KvsEngine> KvsServer<E> {
         let mut writer = BufWriter::new(&tcp);
 
         // create a JSON deserializer from an io::Read
-        let req_reader =
-            Deserializer::from_reader(reader)
-            .into_iter::<Request>();// Turn a JSON deserializer into an iterator over values of type T
+        let req_reader = Deserializer::from_reader(reader).into_iter::<Request>(); // Turn a JSON deserializer into an iterator over values of type T
 
         /// Defines a macro named send_resp! that serializes a Rust data structure ($resp)
         /// into JSON format and sends it to a writer-like object.
@@ -62,9 +58,8 @@ impl<E: KvsEngine> KvsServer<E> {
             ($resp: expr) => {{
                 let resp = $resp;
                 serde_json::to_writer(&mut writer, &resp)?;
-                writer.flush()?;// must import Write trait, why
+                writer.flush()?; // must import Write trait, why
                 debug!("Response sent to {}: {:?}", peer_addr, resp);
-
             };};
         }
 
@@ -73,11 +68,10 @@ impl<E: KvsEngine> KvsServer<E> {
             debug!("Receive request from {}: {:?}", peer_addr, req);
 
             match req {
-                Request::Get { key } =>
-                    send_resp!(match self.engine.get(key) {
-                        Ok(value) => GetResponse::Ok(value),
-                        Err(e) => GetResponse::Err(format!("{}", e)),
-                    }),
+                Request::Get { key } => send_resp!(match self.engine.get(key) {
+                    Ok(value) => GetResponse::Ok(value),
+                    Err(e) => GetResponse::Err(format!("{}", e)),
+                }),
 
                 Request::Set { key, value } => send_resp!(match self.engine.set(key, value) {
                     Ok(_) => SetResponse::Ok(()),
@@ -86,10 +80,9 @@ impl<E: KvsEngine> KvsServer<E> {
                 Request::Remove { key } => send_resp!(match self.engine.remove(key) {
                     Ok(_) => RemoveResponse::Ok(()),
                     Err(e) => RemoveResponse::Err(format!("{}", e)),
-                })
+                }),
             }
         }
-
 
         Ok(())
     }
@@ -115,16 +108,13 @@ fn test_write_trait() -> Result<()> {
     buf_writer.write("hello world".as_bytes())?;
 
     Ok(())
-
 }
-
 
 #[test]
 fn test_serde_json_deserialize() -> Result<()> {
     let file = File::open("1.log")?;
     let reader = BufReader::new(file);
-    let request_iter =
-        Deserializer::from_reader(reader).into_iter::<Request>();
+    let request_iter = Deserializer::from_reader(reader).into_iter::<Request>();
 
     for request in request_iter {
         let request = request?;
@@ -133,15 +123,4 @@ fn test_serde_json_deserialize() -> Result<()> {
     }
 
     Ok(())
-
 }
-
-
-
-
-
-
-
-
-
-
