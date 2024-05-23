@@ -72,13 +72,23 @@ fn cli_get_stored() -> Result<()> {
     let mut store = KvStore::open(path)?;
     store.set("key1".to_owned(), "value1".to_owned())?;
     store.set("key2".to_owned(), "value2".to_owned())?;
+    store.set("key3".to_owned(), "value3".to_owned())?;
+    store.set("key4".to_owned(), "value4".to_owned())?;
+    store.set("key5".to_owned(), "value5".to_owned())?;
+    // store.remove("key1".to_owned())?;
 
     store.set("hello".to_owned(), "world".to_owned())?;
 
     store.set("hello".to_owned(), "rust".to_owned())?;
 
+    store.remove("key1".to_owned())?;
+
+
     // Dispose a value
     drop(store);
+
+    let mut store = KvStore::open(temp_dir.path())?;
+
 
     Command::cargo_bin("kvs")
         .unwrap()
