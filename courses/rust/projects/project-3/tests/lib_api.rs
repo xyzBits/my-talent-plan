@@ -1,3 +1,5 @@
+use std::ffi::OsStr;
+
 mod macro_tests {
     #[macro_export]
     macro_rules! my_vec {
@@ -20,4 +22,13 @@ mod macro_tests {
 
         println!["{:?}", my_vec];
     }
+}
+
+
+#[test]
+fn test_str_ref() {
+    let hello = "hello";
+
+    // return type is generic, so you should specify the generic type at return value
+    let output: &OsStr = hello.as_ref();
 }

@@ -1,11 +1,13 @@
 use std::collections::{BTreeMap, HashMap};
-use std::fs;
+use std::ffi::OsStr;
+use std::{fs, io};
 use std::fs::{File, OpenOptions};
 use std::io::{BufReader, BufWriter, Read, Seek, SeekFrom, Write};
 use std::ops::Range;
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
+use serde_json::Deserializer;
 
 use crate::{KvsError, Result};
 
@@ -43,7 +45,7 @@ pub struct KvStore {
 
     current_gen: u64,
 
-    index: BTreeMap<u64, CommandPos>,
+    index: BTreeMap<String, CommandPos>,
 
     // deleted during a compaction
     uncompacted: u64,
@@ -90,12 +92,58 @@ impl KvStore {
 
     /// Clears stale entries in the log
     pub fn compact(&mut self) -> Result<()> {
+        // increase current gen by 2. current_gen + 1 is for the compaction file
+        let compaction_gen = self.current_gen + 1;
+        self.current_gen += 2;
+
+        self.writer = self.new_log_file(self.current_gen)?;
+
+        let mut compaction_writer = self.new_log_file(compaction_gen)?;
+
+        let mut new_pos = 0; // pos in the new log file
+        for cmd_pos in &mut self.index.values_mut() {
+
+            let reader = self
+                .readers
+                .get_mut(&cmd_pos.gen)
+                .expect("Cannot find log reader");
+
+            if reader.pos != cmd_pos.pos {
+                // get command will let pos seek to a specific position,
+                // so here need to let the reader back to origin position
+                reader.seek(SeekFrom::Start(cmd_pos.pos))?;
+            }
+
+            // just read len size and wrap content as a bufReader stream
+            let mut entry_reader = reader.take(cmd_pos.len);
+            let len = io::copy(&mut entry_reader, &mut compaction_writer)?;
+            *cmd_pos = (compaction_gen, new_pos..new_pos + len).into();
+            new_pos += len;
+        }
+        compaction_writer.flush()?;
+
+        // remove stale log files
+        let stale_gens = self.
+            readers
+            .keys()
+            .filter(|&&gen| gen < compaction_gen)
+            // create an iterator which clone all if its element
+            .cloned()
+            .collect::<Vec<_>>();
+
+        for stale_gen in stale_gens {
+            self.readers.remove(&stale_gen);
+            fs::remove_file(log_path(&self.path, stale_gen))?;
+        }
+
+        self.uncompacted = 0;
+
         Ok(())
     }
 
     /// Create a new log file with given generation number and add the reader to the readers map
     fn new_log_file(&mut self, gen: u64) -> Result<BufWriterWithPos<File>> {
-        todo!()
+        new_log_file(&self.path, gen, &mut self.readers)
     }
 }
 
@@ -136,23 +184,72 @@ fn new_log_file(
 
 /// Returns sorted generation numbers in the given directory
 fn sorted_gen_list(path: &Path) -> Result<Vec<u64>> {
-    let dir = fs::read_dir(path)?
+    let mut gen_list = fs::read_dir(path)?
         // .flat_map(|res | -> Result<PathBuf>{Ok(res?.path())})
         // .flat_map(|res| Ok(res?.path()))
         .flat_map(|res| Ok::<_, KvsError>(res?.path()))
-        // .filter()
-        ;
 
-    todo!()
+        // cannot use the '?' operator in a closure that returns 'PathBuf'
+        // .map(|item| {item?})
+        .filter(|path| path.is_file() && path.extension() == Some("log".as_ref()))
+
+        .flat_map(|path|
+            path.file_name()
+                .and_then(OsStr::to_str)
+                .map(|s| s.trim_end_matches(".log"))
+                .map(str::parse::<u64>)
+        )
+        .flatten()
+        .collect::<Vec<u64>>();
+
+    gen_list.sort_unstable();
+    Ok(gen_list)
 }
 
 /// Load the whole log file and store value locations in the index map
+///
+/// Returns how many bytes can be saved after a compaction
 fn load(
     gen: u64,
     reader: &mut BufReaderWitPos<File>,
-    index: &mut BTreeMap<u64, CommandPos>,
+    index: &mut BTreeMap<String, CommandPos>,
 ) -> Result<u64> {
-    todo!()
+    // To make sure we read from the beginning of the file
+    let mut pos = reader.seek(SeekFrom::Start(0))?;
+
+    let mut stream =
+        Deserializer::from_reader(reader).into_iter::<Command>();
+
+    // number of bytes that can be saved after a compaction
+    let mut uncompacted = 0;
+
+    while let Some(cmd) = stream.next() {
+        // if this is first command, and then  new_pos = cmd.len
+        let new_pos = stream.byte_offset() as u64;
+
+        match cmd? {
+            Command::Set { key, .. } => {
+                // old value is returned
+                if let Some(old_cmd) = index.insert(key, (gen, pos..new_pos).into()) {
+                    uncompacted += old_cmd.len;
+                }
+            }
+
+            Command::Remove { key } => {
+                if let Some(old_cmd) = index.remove(&key) {// if key is remove, it must be in index map
+                    uncompacted += old_cmd.len;
+                }
+
+                // the "remove" command itself can be deleted in the next compaction
+                // so we add its length to 'uncompacted'
+                uncompacted += new_pos - pos;
+            }
+        }
+        pos = new_pos;
+    }
+
+
+    Ok(uncompacted)
 }
 
 fn log_path(dir: &Path, gen: u64) -> PathBuf {
