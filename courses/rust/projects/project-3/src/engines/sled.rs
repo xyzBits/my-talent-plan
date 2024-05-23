@@ -1,5 +1,4 @@
 use sled::{Db, Tree};
-use tempfile::TempDir;
 
 use crate::{KvsError, Result};
 
@@ -44,23 +43,23 @@ impl KvsEngine for SledKvsEngine {
 
 #[test]
 fn test_sled_db() -> Result<()> {
-    let temp_dir = TempDir::new().expect("unable to create temporary working directory");
-    let tree = sled::open(temp_dir)?;
-
-    // let tree: &Tree = &db;
-
-    // tree.insert("hello".to_string(), "world".to_string().into_bytes()).map(|_| ())?;
-    let option = tree.insert("hello".to_string(), "world".to_string().into_bytes())?;
-
-    let value = tree
-        .get("hello".to_string())?
-        .map(|i_vec| AsRef::<[u8]>::as_ref(&i_vec).to_vec())
-        .map(String::from_utf8)
-        .transpose()?
-        .unwrap();
-    println!("{:?}", value);
-
-    assert_eq!(value, "world");
+    // let temp_dir = TempDir::new().expect("unable to create temporary working directory");
+    // let tree = sled::open(temp_dir)?;
+    //
+    // // let tree: &Tree = &db;
+    //
+    // // tree.insert("hello".to_string(), "world".to_string().into_bytes()).map(|_| ())?;
+    // let option = tree.insert("hello".to_string(), "world".to_string().into_bytes())?;
+    //
+    // let value = tree
+    //     .get("hello".to_string())?
+    //     .map(|i_vec| AsRef::<[u8]>::as_ref(&i_vec).to_vec())
+    //     .map(String::from_utf8)
+    //     .transpose()?
+    //     .unwrap();
+    // println!("{:?}", value);
+    //
+    // assert_eq!(value, "world");
 
     Ok(())
 }

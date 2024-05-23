@@ -84,7 +84,7 @@ fn run(opt: Opt) -> Result<()> {
     match opt.command {
         Command::Get { key, addr } => {
             let mut client = KvsClient::connect(addr)?;
-            if let Some(value) = client.get(key) {
+            if let Some(value) = client.get(key)? {
                 println!("{}", value);
             } else {
                 println!("Key not found");
