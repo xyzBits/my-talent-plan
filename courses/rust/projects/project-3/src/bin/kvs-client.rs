@@ -2,6 +2,7 @@ use std::net::SocketAddr;
 use std::process::exit;
 
 use clap::AppSettings;
+use log::info;
 use structopt::StructOpt;
 
 use kvs::*;
@@ -73,6 +74,7 @@ enum Command {
 }
 
 fn main() {
+    info!("start kvs-client");
     let opt = Opt::from_args();
     if let Err(e) = run(opt) {
         eprintln!("{}", e);

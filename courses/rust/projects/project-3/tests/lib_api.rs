@@ -32,3 +32,64 @@ fn test_str_ref() {
     // return type is generic, so you should specify the generic type at return value
     let output: &OsStr = hello.as_ref();
 }
+
+#[cfg(test)]
+mod test_iterator {
+
+    struct Fibonacci {
+        curr: u32,
+        next: u32,
+    }
+
+    impl Iterator for Fibonacci {
+        type Item = u32;
+        fn next(&mut self) -> Option<Self::Item> {
+            let current = self.curr;
+
+            self.curr = self.next;
+            self.next = current + self.next;
+
+            Some(current)
+        }
+    }
+
+    fn fibonacci() -> Fibonacci {
+        Fibonacci {
+            curr: 0,
+            next: 1,
+        }
+    }
+
+    #[test]
+    fn test_iterator() {
+        let mut sequence = 0..3;
+
+
+        println!("{:?}", sequence.next());
+        println!("{:?}", sequence.next());
+        println!("{:?}", sequence.next());
+        println!("{:?}", sequence.next());
+        println!("{:?}", sequence.next());
+
+        for x in fibonacci().take(4) {
+            println!("{}", x);
+        }
+
+        println!("=======================");
+
+        for x in fibonacci().skip(4).take(4) {
+            println!("{}", x);
+        }
+
+
+        for x in fibonacci().take(20).into_iter() {
+            println!("{}", x);
+        }
+
+        println!("))))))))))))))))))))))))))))))))))))))");
+        let array = [1, 3, 4, 6, 3];
+        for x in array.into_iter() {
+            println!("{}", x);
+        }
+    }
+}
