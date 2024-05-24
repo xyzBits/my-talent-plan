@@ -5,6 +5,7 @@ use std::fs::{File, OpenOptions};
 use std::io::{BufReader, BufWriter, Read, Seek, SeekFrom, Write};
 use std::ops::Range;
 use std::path::{Path, PathBuf};
+use log::info;
 
 use serde::{Deserialize, Serialize};
 use serde_json::Deserializer;
@@ -180,15 +181,20 @@ impl KvsEngine for KvStore {
     ///
     /// Returns `None` if the given key does not exist
     fn get(&mut self, key: String) -> Result<Option<String>> {
+        info!("call get, key={key}");
         if let Some(cmd_pos) = self.index.get(&key) {
-            let reader = self.readers
+            let reader = self
+                .readers
                 .get_mut(&cmd_pos.gen)
                 .expect("Cannot find log reader");
 
             reader.seek(SeekFrom::Start(cmd_pos.pos))?;
 
             let cmd_reader = reader.take(cmd_pos.len);
+            info!("cmd_pos gen:{}, len:{}, pos:{}", cmd_pos.gen, cmd_pos.len, cmd_pos.pos);
+
             if let Command::Set { value, .. } = serde_json::from_reader(cmd_reader)? {
+                info!("value:{}", value);
                 Ok(Some(value))
             } else {
                 Err(KvsError::UnexpectedCommandType)
@@ -428,8 +434,13 @@ impl<W: Write + Seek> Seek for BufWriterWithPos<W> {
 mod kvs_test_mod {
     use std::env::current_dir;
     use std::fmt::Debug;
+    use std::fs::File;
+    use std::io;
+    use std::io::BufReader;
+    use std::path::PathBuf;
 
     use crate::{KvStore, Result};
+    use crate::engines::kvs::Command;
 
     #[test]
     fn test_path_buf() -> Result<()> {
@@ -452,5 +463,18 @@ mod kvs_test_mod {
 
         let input = "hello";
         hello(input);
+    }
+
+    #[test]
+    fn test_read_json() -> io::Result<()> {
+        let path = r#"/var/folders/zq/fl9ndsq103z0x65773b6mj8h0000gn/T/.tmpT0MD6h/1.log"#;
+        let mut buf = PathBuf::new();
+        buf.push(path);
+
+        let x = BufReader::new(File::open(buf)?);
+        let command = serde_json::from_reader::<_, Command>(x)?;
+
+        println!("{:?}", command);
+        Ok(())
     }
 }
