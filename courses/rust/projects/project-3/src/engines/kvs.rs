@@ -61,7 +61,7 @@ impl KvStore {
     ///
     /// It propagates I/O or deserialization errors during the log replay
     // pub fn open<T: Into<PathBuf>>(path: T) -> Result<KvStore> {
-    pub fn open<T: Into<PathBuf>>(path: T) -> Result<KvStore> {
+    pub fn open<T: Into<PathBuf> + AsRef<Path>>(path: T) -> Result<KvStore> {
         // the type of path is T, after into, the type is pathBuf, it is convenient to the future use
         let path = path.into();
         fs::create_dir_all(&path)?;

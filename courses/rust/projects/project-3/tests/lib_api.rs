@@ -1,4 +1,6 @@
 use std::ffi::OsStr;
+use std::thread;
+use std::time::Duration;
 
 mod macro_tests {
     #[macro_export]
@@ -152,4 +154,23 @@ mod test_serde_json {
         Ok(())
 
     }
+}
+
+
+#[test]
+fn test_thread_join() {
+    let handle = thread::spawn(|| {
+        for i in 0..10 {
+            println!("i = {}", i);
+            thread::sleep(Duration::from_secs(3));
+        }
+    });
+
+    thread::sleep(Duration::from_secs(2));
+
+    println!("hello world");
+
+    handle.join().unwrap();
+
+
 }

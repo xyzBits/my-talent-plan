@@ -200,7 +200,7 @@ fn cli_log_configuration() {
 
     let content = fs::read_to_string(&stderr_path).expect("unable to read from stderr file");
 
-    println!("content = \r\n{}", content);
+    // println!("content = \r\n{}", content);
 
     assert!(content.contains(env!("CARGO_PKG_VERSION")));
     assert!(content.contains("kvs"));
@@ -254,6 +254,8 @@ fn cli_wrong_engine() {
 
 
 fn cli_access_server(engine: &str, addr: &str) {
+    // multiple producer, single consumer FIFO queue communication primitive
+    // Creates synchronous, bounded channel. All data sent from
     let (sender, receiver) = mpsc::sync_channel(0);
 
     let temp_dir = TempDir::new().unwrap();
@@ -267,6 +269,13 @@ fn cli_access_server(engine: &str, addr: &str) {
         .unwrap();
 
     let handle = thread::spawn(move || {
+        // Attempts to wait for a value on this receiver, returning
+        // an error if the corresponding channel has hung up.
+        // This function will always block the current thread if there is
+        // no data available and it's possible for more data to be sent
+        // once a message is sent to the corresponding Sender,
+        // this receiver will wake up and return the message
+
         let _ = receiver.recv();// wait for main thread to finish
         child.kill().expect("server exited before killed");
     });
@@ -382,6 +391,8 @@ fn cli_access_server(engine: &str, addr: &str) {
         .stdout(contains("Key not found"));
 
     sender.send(()).unwrap();
+
+    // waits for the associated thread to finish
     handle.join().unwrap();
 
 }
@@ -393,6 +404,6 @@ fn cli_access_server_kvs_engine() {
 
 #[test]
 fn cli_access_server_sled_engine() {
-    cli_access_server("sled", "127.0.0.1:4005");
+    cli_access_server("sled", "127.0.0.1:4009");
 
 }
