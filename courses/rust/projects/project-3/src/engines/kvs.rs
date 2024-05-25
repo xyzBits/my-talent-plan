@@ -5,8 +5,8 @@ use std::fs::{File, OpenOptions};
 use std::io::{BufReader, BufWriter, Read, Seek, SeekFrom, Write};
 use std::ops::Range;
 use std::path::{Path, PathBuf};
-use log::info;
 
+use log::info;
 use serde::{Deserialize, Serialize};
 use serde_json::Deserializer;
 
@@ -23,7 +23,7 @@ const COMPACTION_THRESHOLD: u64 = 1024 * 1024;
 /// A `BTreeMap` in memory stores the keys and the value locations for fast query.
 ///
 /// ```rust
-/// # use kvs::{KvsEngine, KvStore, Result};
+/// # use kvs::{KvStore, Result};
 /// # fn try_main() -> Result<()> {
 /// use std::env::current_dir;
 /// use kvs::KvsEngine;
@@ -39,7 +39,7 @@ pub struct KvStore {
     path: PathBuf,
 
     // map generation number to the file reader
-    readers: HashMap<u64, BufReaderWitPos<File>>,
+    readers: HashMap<u64, BufReaderWithPos<File>>,
 
     // writer of the current log
     writer: BufWriterWithPos<File>,
@@ -61,7 +61,7 @@ impl KvStore {
     ///
     /// It propagates I/O or deserialization errors during the log replay
     // pub fn open<T: Into<PathBuf>>(path: T) -> Result<KvStore> {
-    pub fn open<T: Into<PathBuf> + AsRef<Path>>(path: T) -> Result<KvStore> {
+    pub fn open<T: Into<PathBuf>>(path: T) -> Result<KvStore> {
         // the type of path is T, after into, the type is pathBuf, it is convenient to the future use
         let path = path.into();
         fs::create_dir_all(&path)?;
@@ -73,7 +73,7 @@ impl KvStore {
         let mut uncompacted = 0;
 
         for &gen in &gen_list {
-            let mut reader = BufReaderWitPos::new(File::open(log_path(&path, gen))?)?;
+            let mut reader = BufReaderWithPos::new(File::open(log_path(&path, gen))?)?;
             uncompacted += load(gen, &mut reader, &mut index)?;
             readers.insert(gen, reader);
         }
@@ -190,8 +190,13 @@ impl KvsEngine for KvStore {
 
             reader.seek(SeekFrom::Start(cmd_pos.pos))?;
 
-            let cmd_reader = reader.take(cmd_pos.len);
+            let mut cmd_reader = reader.take(cmd_pos.len);
             info!("cmd_pos gen:{}, len:{}, pos:{}", cmd_pos.gen, cmd_pos.len, cmd_pos.pos);
+            //
+            // let mut container = String::new();
+            // cmd_reader.read_to_string(&mut container)?;
+            // info!("cmd_pos gen:{}, len:{}, pos:{}, container:{}", cmd_pos.gen, cmd_pos.len, cmd_pos.pos, container);
+
 
             if let Command::Set { value, .. } = serde_json::from_reader(cmd_reader)? {
                 info!("value:{}", value);
@@ -235,18 +240,18 @@ impl KvsEngine for KvStore {
 fn new_log_file(
     path: &Path,
     gen: u64,
-    readers: &mut HashMap<u64, BufReaderWitPos<File>>,
+    readers: &mut HashMap<u64, BufReaderWithPos<File>>,
 ) -> Result<BufWriterWithPos<File>> {
-    let path_buf = log_path(path, gen);
+    let path = log_path(&path, gen);
     let writer = BufWriterWithPos::new(
         OpenOptions::new()
             .create(true)
             .write(true)
             .append(true)
-            .open(&path_buf)?,
+            .open(&path)?,
     )?;
 
-    readers.insert(gen, BufReaderWitPos::new(File::open(&path_buf)?)?);
+    readers.insert(gen, BufReaderWithPos::new(File::open(&path)?)?);
     Ok(writer)
 }
 
@@ -255,18 +260,19 @@ fn sorted_gen_list(path: &Path) -> Result<Vec<u64>> {
     let mut gen_list = fs::read_dir(path)?
         // .flat_map(|res | -> Result<PathBuf>{Ok(res?.path())})
         // .flat_map(|res| Ok(res?.path()))
-        .flat_map(|res| Ok::<_, KvsError>(res?.path()))
+        // .flat_map(|res| Ok::<_, KvsError>(res?.path()))
+        .flat_map(|res| -> Result<_> { Ok(res?.path()) })
 
         // cannot use the '?' operator in a closure that returns 'PathBuf'
         // .map(|item| {item?})
         .filter(|path| path.is_file() && path.extension() == Some("log".as_ref()))
 
-        .flat_map(|path|
+        .flat_map(|path| {
             path.file_name()
                 .and_then(OsStr::to_str)
                 .map(|s| s.trim_end_matches(".log"))
                 .map(str::parse::<u64>)
-        )
+        })
         .flatten()
         .collect::<Vec<u64>>();
 
@@ -279,7 +285,7 @@ fn sorted_gen_list(path: &Path) -> Result<Vec<u64>> {
 /// Returns how many bytes can be saved after a compaction
 fn load(
     gen: u64,
-    reader: &mut BufReaderWitPos<File>,
+    reader: &mut BufReaderWithPos<File>,
     index: &mut BTreeMap<String, CommandPos>,
 ) -> Result<u64> {
     // To make sure we read from the beginning of the file
@@ -363,36 +369,38 @@ impl From<(u64, Range<u64>)> for CommandPos {
 }
 
 
-struct BufReaderWitPos<R: Seek + Read> {
+struct BufReaderWithPos<R: Seek + Read> {
     reader: BufReader<R>,
     pos: u64,
 }
 
 
-impl<R: Seek + Read> BufReaderWitPos<R> {
+impl<R: Seek + Read> BufReaderWithPos<R> {
     fn new(mut inner: R) -> Result<Self> {
         let pos = inner.seek(SeekFrom::Current(0))?;
-        Ok(BufReaderWitPos {
+        Ok(BufReaderWithPos {
             reader: BufReader::new(inner),
             pos,
         })
     }
 }
 
-impl<R: Seek + Read> Seek for BufReaderWitPos<R> {
+impl<R: Seek + Read> Read for BufReaderWithPos<R> {
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        let len = self.reader.read(buf)?;
+        self.pos += len as u64;
+        Ok(len)
+    }
+}
+
+impl<R: Seek + Read> Seek for BufReaderWithPos<R> {
     fn seek(&mut self, pos: SeekFrom) -> std::io::Result<u64> {
         self.pos = self.reader.seek(pos)?;
         Ok(self.pos)
     }
 }
 
-impl<R: Seek + Read> Read for BufReaderWitPos<R> {
-    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
-        let len = self.read(buf)?;
-        self.pos += len as u64;
-        Ok(len)
-    }
-}
+
 
 
 struct BufWriterWithPos<W: Write + Seek> {
@@ -436,7 +444,7 @@ mod kvs_test_mod {
     use std::fmt::Debug;
     use std::fs::File;
     use std::io;
-    use std::io::BufReader;
+    use std::io::{BufReader, Read, Seek, SeekFrom};
     use std::path::PathBuf;
 
     use crate::{KvStore, Result};
@@ -467,12 +475,16 @@ mod kvs_test_mod {
 
     #[test]
     fn test_read_json() -> io::Result<()> {
-        let path = r#"/var/folders/zq/fl9ndsq103z0x65773b6mj8h0000gn/T/.tmpT0MD6h/1.log"#;
+        let path = r#"/var/folders/zq/fl9ndsq103z0x65773b6mj8h0000gn/T/.tmpoBhGpV/1.log"#;
+        let path = r#"1.log"#;
         let mut buf = PathBuf::new();
         buf.push(path);
 
-        let x = BufReader::new(File::open(buf)?);
-        let command = serde_json::from_reader::<_, Command>(x)?;
+        let mut reader = BufReader::new(File::open(buf)?);
+        reader.seek(SeekFrom::Start(0))?;
+        let cmd_reader = reader.take(39);
+
+        let command = serde_json::from_reader::<_, Command>(cmd_reader)?;
 
         println!("{:?}", command);
         Ok(())
