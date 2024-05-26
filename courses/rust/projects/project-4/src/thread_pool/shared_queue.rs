@@ -21,20 +21,22 @@ pub struct SharedQueueThreadPool {
     // 'static indicates the closure lifetime extend entire program's lifetime
 
     // tx is a sender used to send the closure to the pool
-    tx: Sender<Box<dyn FnOnce() + Send + 'static>>,
+    sender: Sender<Box<dyn FnOnce() + Send + 'static>>,
 }
 
 impl ThreadPool for SharedQueueThreadPool {
     fn new(threads: u32) -> crate::Result<Self>
         where Self: Sized {
-        let (tx, rx) =
-            channel::unbounded::<Box<dyn FnOnce() + Send + 'static>>();
+        let (sender, receiver) =
+
+            channel// multiple producer and multiple consumer
+            ::unbounded::<Box<dyn FnOnce() + Send + 'static>>();// creates a channel of unbounded capacity
 
         for _ in 0..threads {
-            let rx = TaskReceiver(rx.clone());
+            let rx = TaskReceiver(receiver.clone());
             thread::Builder::new().spawn(move || run_tasks(rx))?;
         }
-        Ok(SharedQueueThreadPool { tx })
+        Ok(SharedQueueThreadPool { sender })
     }
 
     /// Spawns a function into the thread pool
@@ -44,7 +46,7 @@ impl ThreadPool for SharedQueueThreadPool {
     /// Panics if the thread pool has no thread.
     fn spawn<F>(&self, job: F)
         where F: FnOnce() + Send + 'static {
-        self.tx
+        self.sender
             .send(Box::new(job))
             .expect("The thread pool has no thread.");
     }
@@ -65,9 +67,9 @@ impl Drop for TaskReceiver {
     }
 }
 
-fn run_tasks(rx: TaskReceiver) {
+fn run_tasks(task_receiver: TaskReceiver) {
     loop {
-        match rx.0.recv() {
+        match task_receiver.0.recv() {
             Ok(task) => {
                 task();
             }

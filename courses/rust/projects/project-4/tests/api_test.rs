@@ -120,3 +120,12 @@ mod test_trait_object {
 
     }
 }
+
+#[cfg(test)]
+mod test_channel {
+    fn std_sync_mpsc_channel() {
+
+        // multiple producer and single consumer
+        let (receiver, sender) = std::sync::mpsc::channel();
+    }
+}
