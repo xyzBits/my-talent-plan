@@ -24,3 +24,8 @@ tempfile = "3.0.7"
 walkdir = "2.2.7"
 
 
+[[bench]]
+name = "engine_bench"
+# disable built-in test harness for running this particular benchmark
+harness = false
+
