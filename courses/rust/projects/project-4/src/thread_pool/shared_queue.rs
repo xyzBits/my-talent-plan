@@ -58,8 +58,8 @@ struct TaskReceiver(Receiver<Box<dyn FnOnce() + Send + 'static>>);
 impl Drop for TaskReceiver {
     fn drop(&mut self) {
         if thread::panicking() {
-            let rx = self.clone();
-            if let Err(e) = thread::Builder::new().spawn(move || run_tasks(rx)) {
+            let task_receiver = self.clone();
+            if let Err(e) = thread::Builder::new().spawn(move || run_tasks(task_receiver)) {
                 error!("Failed to spawn a thread: {}", e);
             }
         }
