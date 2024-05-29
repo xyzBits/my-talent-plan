@@ -4,10 +4,20 @@ use rand::{Rng, SeedableRng};
 use tempfile::TempDir;
 
 use kvs::{KvsEngine, KvStore, SledKvsEngine};
-use kvs::KvsError::Sled;
 
+/// Criterion
+///     The benchmark manager
+///     Criterion lets you configure and execute benchmarks
+///     Each benchmark consists of four phases
+///         - warm-up： The routine is repeatedly executed， to let the cup/os/jit/interpreter adapt to the new load
+///         - measurement: The routine is repeatedly executed, and timing information is collected into a sample
+///         - analysis: the sample is analyzed and distilled into meaningful statistics that get reported to stdout, sorted in files, and plotted
+///         - comparison: the current sample is compared with the sample obtained in the previous benchmark.
 fn set_bench(c: &mut Criterion) {
+    // Return a benchmark group. All benchmarks performed using a benchmark group will be grouped together in the final report
     let mut group = c.benchmark_group("set_bench");
+
+    // Benchmark the given parameterless function this benchmark group
     group.bench_function("kvs", |b| {
         b.iter_batched(
             || {
