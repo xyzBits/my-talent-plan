@@ -8,5 +8,6 @@ pub mod engine;
 
 pub mod server;
 
+pub mod client;
 
 pub use error::{Result, KvsError};
