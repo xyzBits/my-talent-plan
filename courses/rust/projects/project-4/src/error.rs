@@ -63,7 +63,7 @@ impl From<sled::Error> for KvsError {
     }
 }
 
-/// Result type for kvs
+/// Result type for kvs, let error type fixed
 pub type Result<T> = std::result::Result<T, KvsError>;
 
 
