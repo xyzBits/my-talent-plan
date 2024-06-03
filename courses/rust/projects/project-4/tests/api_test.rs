@@ -128,4 +128,9 @@ mod test_channel {
         // multiple producer and single consumer
         let (receiver, sender) = std::sync::mpsc::channel();
     }
+
+    #[test]
+    fn test() {
+
+    }
 }
