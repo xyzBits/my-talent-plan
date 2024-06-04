@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 #[test]
 fn panic_test() {
     std::panic::set_hook(Box::new(|panic_info| {
@@ -123,14 +125,89 @@ mod test_trait_object {
 
 #[cfg(test)]
 mod test_channel {
+    use std::sync::{Arc, Mutex};
+    use std::thread;
+    use std::time::Duration;
+
     fn std_sync_mpsc_channel() {
 
         // multiple producer and single consumer
-        let (receiver, sender) = std::sync::mpsc::channel();
+        // let (receiver, sender) = std::sync::mpsc::channel();
     }
 
     #[test]
     fn test() {
+        let apple = Arc::new("the same apple");
+
+        for _ in 0..10 {
+            let apple = Arc::clone(&apple);
+
+            thread::spawn(move || {
+                println!("{}", apple);
+            });
+
+        }
+
+        thread::sleep(Duration::from_secs(1));
+
 
     }
+
+
+
+    #[test]
+    fn test_add() {
+        let data = Arc::new(Mutex::new(0));
+
+        let mut handles = vec![];
+        for _ in 0..100 {
+            let data = Arc::clone(&data);
+            let handle = thread::spawn(move || {
+                let mut guard = data.lock().unwrap();
+                *guard += 1
+            });
+
+            handles.push(handle);
+        }
+
+
+        for handle in handles {
+            handle.join().unwrap();
+        }
+
+        println!("{:?}", data);
+    }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+}
+
+#[test]
+fn test_arc_1() {
+    let foo = Arc::new(vec![1, 2, 3, 4]);
+
+
 }

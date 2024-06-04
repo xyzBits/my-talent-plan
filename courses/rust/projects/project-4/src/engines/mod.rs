@@ -5,7 +5,10 @@ use crate::{Result};
 pub mod kvs;
 pub mod sled;
 
-/// Trait for a key value store engine.
+pub use self::kvs::KvStore;
+pub use self::sled::SledKvsEngine;
+
+/// Trait for a key value store engines.
 pub trait KvsEngine: Clone + Send + 'static {
     /// Sets the value of a string key to a string
     ///

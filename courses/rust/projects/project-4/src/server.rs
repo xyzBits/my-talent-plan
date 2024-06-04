@@ -8,7 +8,7 @@ use log::{debug, error};
 use serde_json::Deserializer;
 
 use crate::common::{GetResponse, RemoveResponse, Request, SetResponse};
-use crate::engine::KvsEngine;
+use crate::engines::KvsEngine;
 use crate::Result;
 use crate::thread_pool::ThreadPool;
 
@@ -20,7 +20,7 @@ pub struct KvsServer<E: KvsEngine, P: ThreadPool> {
 
 
 impl<E: KvsEngine, P: ThreadPool> KvsServer<E, P> {
-    /// Create a `KvsServer` with a given storage engine.
+    /// Create a `KvsServer` with a given storage engines.
     pub fn new(engine: E, pool: P) -> Self {
         KvsServer {
             engine,

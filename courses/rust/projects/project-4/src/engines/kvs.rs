@@ -9,17 +9,38 @@ use std::sync::atomic::AtomicU64;
 
 use crossbeam_skiplist::SkipMap;
 use serde::{Deserialize, Serialize};
-use crate::engine::KvsEngine;
+use crate::engines::KvsEngine;
 
 use crate::Result;
 
 const COMPACTION_THRESHOLD: u64 = 1024 * 1024;
 
+/// The `KvStore` stores string key/value pairs.
 ///
+/// Key/value pairs are persisted to disk in log file. Log file are named after
+/// monotonically increasing generation numbers with a `log` extension name.
+/// A skip list in memory stores the keys and the value locations for fast query.
+///
+///
+/// ```rust
+/// # use kvs::{KvStore, Result};
+/// # fn try_main() -> Result<()> {
+/// use std::env::current_dir;
+/// use kvs::KvsEngine;
+/// let mut store = KvStore::open(current_dir()?)?;
+/// store.set("key".to_owned(), "value".to_owned());
+/// let val = store.get("key".to_owned())?;
+///
+/// assert_eq!(val, Some("value".to_owned()));
+/// # Ok(())
+/// # }
+/// ```
 #[derive(Clone)]
 pub struct KvStore {
+    /// directory for the log and other data
     path: Arc<PathBuf>,
 
+    /// map generation number to the file reader
     index: Arc<SkipMap<String, CommandPos>>,
 
     reader: KvStoreReader,
