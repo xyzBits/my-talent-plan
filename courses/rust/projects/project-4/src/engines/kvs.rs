@@ -67,7 +67,12 @@ impl KvsEngine for KvStore {
 }
 
 
-
+/// A single thread reader.
+///
+/// Each `KvStore` instance ias its own `KvStoreReader` and
+/// `KvStoreReader`'s open the same files separately. So the user
+/// can read concurrently through multiple `KvStore`'s in different
+/// threads
 struct KvStoreReader {
     path: Arc<PathBuf>,
     // generation of the latest compaction file
