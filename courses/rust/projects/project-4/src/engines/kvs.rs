@@ -1,6 +1,7 @@
 use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::fs::File;
+use std::io;
 use std::io::{BufReader, BufWriter, Read, Seek, SeekFrom, Write};
 use std::ops::Range;
 use std::path::{Path, PathBuf};
@@ -28,7 +29,7 @@ const COMPACTION_THRESHOLD: u64 = 1024 * 1024;
 /// use std::env::current_dir;
 /// use kvs::KvsEngine;
 /// let mut store = KvStore::open(current_dir()?)?;
-/// store.set("key".to_owned(), "value".to_owned());
+/// store.set("key".to_owned(), "value".to_owned())?;
 /// let val = store.get("key".to_owned())?;
 ///
 /// assert_eq!(val, Some("value".to_owned()));
@@ -49,6 +50,17 @@ pub struct KvStore {
 }
 
 impl KvStore {
+
+    /// Opens a `KvStore` with the given path.
+    ///
+    /// This will create a new directory if the given one does not exist.
+    ///
+    /// # Errors
+    ///
+    /// It propagates I/O or deserialization errors during the log replay.
+    pub fn open(path: impl Into<PathBuf>) -> Result<KvStore> {
+        todo!()
+    }
 
 }
 
@@ -82,6 +94,26 @@ struct KvStoreReader {
 
 impl KvStoreReader {
 
+    /// Close file handles with generation number less than safe_point.
+    ///
+    /// `safe_point` is updated to the latest the sum of all operations before it and the
+    /// in-memory index contains no entries with generation number less than safe_point.
+    /// So we can safely close file handles and the stale files can be deleted.
+    fn close_stale_handles(&self) {
+        todo!()
+    }
+
+    /// Read the log file at the given `CommandPos`.
+    fn read_and<F, R>(&self, cmd_pos: CommandPos, f: F) -> Result<R>
+    where F: FnOnce(io::Take<&mut BufReaderWithPos<File>>) -> Result<R> {
+        todo!()
+    }
+
+    /// Read the log file at the given `CommandPos` and deserialize it to `Command`
+    fn read_command(&self, cmd_pos: CommandPos) -> Result<Command> {
+        todo!()
+    }
+
 }
 
 impl Clone for KvStoreReader {
@@ -99,21 +131,38 @@ struct KvStoreWriter {
 }
 
 impl KvStoreWriter {
+    fn set(&mut self, key: String, value: String) -> Result<()> {
+        todo!()
+    }
+
+    fn remove(&mut self, key: String) -> Result<()> {
+        todo!()
+    }
+
+    /// Clears stale entries in the log.
+    fn compact(&mut self) -> Result<()> {
+        todo!()
+    }
 
 }
 
 
 
-
+/// Create a new log file with given generation number and add the reader to the readers map.
+///
+/// Returns the writer to the log.
 fn new_log_file(path: &Path, gen: u64) -> Result<BufWriterWithPos<File>> {
     todo!()
 }
 
-
+/// Returns sorted generation numbers in the given directory
 fn sorted_gen_list(path: &Path) -> Result<Vec<u64>> {
     todo!()
 }
 
+/// Load the whole log file and store value locations in the index map
+///
+/// Returns how many bytes can be saved after a compaction
 fn load(
     gen: u64,
     reader: &mut BufReaderWithPos<File>,
