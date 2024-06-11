@@ -1,7 +1,7 @@
+use std::{fs, io};
 use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::fs::File;
-use std::{fs, io};
 use std::io::{BufReader, BufWriter, Read, Seek, SeekFrom, Write};
 use std::ops::Range;
 use std::path::{Path, PathBuf};
@@ -10,8 +10,8 @@ use std::sync::atomic::AtomicU64;
 
 use crossbeam_skiplist::SkipMap;
 use serde::{Deserialize, Serialize};
-use crate::engines::KvsEngine;
 
+use crate::engines::KvsEngine;
 use crate::Result;
 
 const COMPACTION_THRESHOLD: u64 = 1024 * 1024;
@@ -50,7 +50,6 @@ pub struct KvStore {
 }
 
 impl KvStore {
-
     /// Opens a `KvStore` with the given path.
     ///
     /// This will create a new directory if the given one does not exist.
@@ -65,9 +64,41 @@ impl KvStore {
         let mut readers = BTreeMap::new();
         let index = Arc::new(SkipMap::new());
 
-        todo!()
-    }
+        let gen_list = sorted_gen_list(&path)?;
+        let mut uncompacted = 0;
 
+        for &gen in &gen_list {
+            let mut reader = BufReaderWithPos::new(File::open(log_path(&path, gen))?)?;
+            uncompacted += load(gen, &mut reader, &*index)?;
+            readers.insert(gen, reader);
+        }
+
+        let current_gen = gen_list.last().unwrap_or(&0) + 1;
+        let writer = new_log_file(&path, current_gen)?;
+        let safe_point = Arc::new(AtomicU64::new(0));
+
+        let reader = KvStoreReader {
+            path: Arc::clone(&path),
+            safe_point,
+            readers: RefCell::new(readers),
+        };
+
+        let writer = KvStoreWriter {
+            reader: reader.clone(),
+            writer,
+            current_gen,
+            uncompacted,
+            path: Arc::clone(&path),
+            index: Arc::clone(&index),
+        };
+
+        Ok(KvStore {
+            path,
+            reader,
+            index,
+            writer: Arc::new(Mutex::new(writer)),
+        })
+    }
 }
 
 impl KvsEngine for KvStore {
@@ -99,7 +130,6 @@ struct KvStoreReader {
 }
 
 impl KvStoreReader {
-
     /// Close file handles with generation number less than safe_point.
     ///
     /// `safe_point` is updated to the latest the sum of all operations before it and the
@@ -111,7 +141,7 @@ impl KvStoreReader {
 
     /// Read the log file at the given `CommandPos`.
     fn read_and<F, R>(&self, cmd_pos: CommandPos, f: F) -> Result<R>
-    where F: FnOnce(io::Take<&mut BufReaderWithPos<File>>) -> Result<R> {
+        where F: FnOnce(io::Take<&mut BufReaderWithPos<File>>) -> Result<R> {
         todo!()
     }
 
@@ -119,7 +149,6 @@ impl KvStoreReader {
     fn read_command(&self, cmd_pos: CommandPos) -> Result<Command> {
         todo!()
     }
-
 }
 
 impl Clone for KvStoreReader {
@@ -132,6 +161,9 @@ struct KvStoreWriter {
     reader: KvStoreReader,
     writer: BufWriterWithPos<File>,
     current_gen: u64,
+    // the number of bytes representing "stale" commands that could be
+    // deleted during compaction
+    uncompacted: u64,
     path: Arc<PathBuf>,
     index: Arc<SkipMap<String, CommandPos>>,
 }
@@ -149,9 +181,7 @@ impl KvStoreWriter {
     fn compact(&mut self) -> Result<()> {
         todo!()
     }
-
 }
-
 
 
 /// Create a new log file with given generation number and add the reader to the readers map.
@@ -172,7 +202,7 @@ fn sorted_gen_list(path: &Path) -> Result<Vec<u64>> {
 fn load(
     gen: u64,
     reader: &mut BufReaderWithPos<File>,
-    index: &SkipMap<String, CommandPos>
+    index: &SkipMap<String, CommandPos>,
 ) -> Result<u64> {
     todo!()
 }
@@ -234,8 +264,6 @@ impl<R: Read + Seek> BufReaderWithPos<R> {
         })
     }
 }
-
-
 
 
 impl<R: Read + Seek> Read for BufReaderWithPos<R> {
