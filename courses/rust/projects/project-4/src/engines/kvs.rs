@@ -1,7 +1,7 @@
 use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::fs::File;
-use std::io;
+use std::{fs, io};
 use std::io::{BufReader, BufWriter, Read, Seek, SeekFrom, Write};
 use std::ops::Range;
 use std::path::{Path, PathBuf};
@@ -59,6 +59,12 @@ impl KvStore {
     ///
     /// It propagates I/O or deserialization errors during the log replay.
     pub fn open(path: impl Into<PathBuf>) -> Result<KvStore> {
+        let path = Arc::new(path.into());
+        fs::create_dir_all(&*path)?;
+
+        let mut readers = BTreeMap::new();
+        let index = Arc::new(SkipMap::new());
+
         todo!()
     }
 
