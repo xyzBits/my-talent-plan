@@ -10,4 +10,6 @@ with synchronous networking over a custom protocol.
 - Share data structures with lock
 - Perform reader operations with locks 
 - Benchmark single-threaded vs multithreaded
-- 
+
+**Topics**: thread pools, channels, locks, lock-free data structures,
+
