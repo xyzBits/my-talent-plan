@@ -115,6 +115,7 @@ fn current_engine() -> Result<Option<Engine>> {
     }
 
     match fs::read_to_string(engine)?.parse() {
+        // type inferred from the return type of this function
         Ok(engine) => Ok(Some(engine)),
 
         Err(e) => {
