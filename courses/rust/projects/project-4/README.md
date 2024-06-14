@@ -13,3 +13,12 @@ with synchronous networking over a custom protocol.
 
 **Topics**: thread pools, channels, locks, lock-free data structures,
 
+
+## Introduction
+
+In this project you will create a simple key/value server and client that
+communicate over a custom protocol. The server will use synchronous networking,
+and will respond to multiple requests using increasingly sophisticated
+concurrent implementations. The in-memory index will become a concurrent
+data structure, shared by all threads, and compaction will be done on a
+dedicated thread, to reduce latency of individual requests. 

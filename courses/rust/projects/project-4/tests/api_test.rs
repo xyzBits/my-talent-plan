@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 #[test]
 fn panic_test() {
     std::panic::set_hook(Box::new(|panic_info| {
@@ -18,10 +16,12 @@ mod closure_test {
     /// captured variables
 
 
-    fn consume_with_relish<F>(func: F)// move occurs because func has type F, which does not implement the Copy trait
-        where F: FnOnce(u32) -> String {
+    fn consume_with_relish<F>(func: F) // move occurs because func has type F, which does not implement the Copy trait
+    where
+        F: FnOnce(u32) -> String,
+    {
         // func consumes its captured variables, so it cannot be run more than once
-        println!("Consumed: {}", func(1));// func moved due to this call
+        println!("Consumed: {}", func(1)); // func moved due to this call
 
         println!("Delicious");
 
@@ -49,7 +49,9 @@ mod closure_test {
 
 
     fn fn_once<F>(func: F)
-        where F: FnOnce(usize) -> bool + Copy {
+    where
+        F: FnOnce(usize) -> bool + Copy,
+    {
         println!("{:?}", func(3));
         println!("{:?}", func(4));
     }
@@ -88,6 +90,7 @@ mod test_trait_object {
     struct Sheep {}
 
     struct Cow {}
+
     trait Animal {
         // Instance method signature
         fn noise(&self) -> &'static str;
@@ -108,9 +111,9 @@ mod test_trait_object {
     // Returns some struct that implements animal, but we don't know which one at compile time
     fn random_animal(random_number: f64) -> Box<dyn Animal> {
         if random_number < 0.5 {
-            Box::new(Sheep{})
+            Box::new(Sheep {})
         } else {
-            Box::new(Cow{})
+            Box::new(Cow {})
         }
     }
 
@@ -119,7 +122,6 @@ mod test_trait_object {
         let random_number = 0.345;
         let animal = random_animal(random_number);
         println!("{}", animal.noise());
-
     }
 }
 
@@ -145,14 +147,10 @@ mod test_channel {
             thread::spawn(move || {
                 println!("{}", apple);
             });
-
         }
 
         thread::sleep(Duration::from_secs(1));
-
-
     }
-
 
 
     #[test]
@@ -177,37 +175,60 @@ mod test_channel {
 
         println!("{:?}", data);
     }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 }
 
-#[test]
-fn test_arc_1() {
-    let foo = Arc::new(vec![1, 2, 3, 4]);
+
+#[cfg(test)]
+mod test_arc {
+    use std::sync::Arc;
+    use std::thread;
+    use std::time::Duration;
+
+    #[test]
+    fn test_arc_1() {
+        let foo = Arc::new(vec![1, 2, 3, 4]);
+
+
+    }
+
+    // When shared ownership between threads is need, Arc (atomically Reference Counted)
+    // can be used, This struct via the Clone implementation can create a reference pointer
+    // for the location of a value in the memory heap while increasing the reference counter.
+    // As it shares ownership between threads, when the last reference pointer to a value
+    // is out of scope, the variable is dropped.
+
+    #[test]
+    fn test_share_ownership_between_threads() {
+        let apple = Arc::new("the same apple");
+
+        for _ in 0..10 {
+            // Here there is no value specification as it is a pointer to a
+            // reference in the memory heap.
+            let apple = Arc::clone(&apple);
+
+            thread::spawn(move || {
+                // As arc was used, threads can be spawned using the valued allocated
+                // in the Arc variable pointer's location.
+                println!("{}", apple);
+            });
+        }
+
+        // Make sure all arc instances are printed from spawned threads.
+        thread::sleep(Duration::from_secs(1));
+    }
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 }
