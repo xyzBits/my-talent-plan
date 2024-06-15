@@ -180,15 +180,13 @@ mod test_channel {
 
 #[cfg(test)]
 mod test_arc {
-    use std::sync::Arc;
+    use std::sync::{Arc, Mutex};
     use std::thread;
     use std::time::Duration;
 
     #[test]
     fn test_arc_1() {
         let foo = Arc::new(vec![1, 2, 3, 4]);
-
-
     }
 
     // When shared ownership between threads is need, Arc (atomically Reference Counted)
@@ -217,18 +215,58 @@ mod test_arc {
         thread::sleep(Duration::from_secs(1));
     }
 
+    #[test]
+    fn test_arc_mutex() {
+        // create my data, wrap it in a mutex, then add atomic reference counting
+        let my_data = vec![1, 2, 3];
+        let my_data = Mutex::new(my_data);
+        let my_data = Arc::new(my_data);
+
+        // spawn a thread that will update the values,
+        // a clone of our Arc will be moved into the thread
+        let thread_arc = my_data.clone();
+        let t1 = thread::spawn(move || {
+            println!("Thread 1 attempting to acquire lock.....");
+
+            if let Ok(mut x) = thread_arc.lock() {
+                println!("Thread 1 acquired lock");
+                for num in x.iter_mut() {
+                    *num += 1;
+                }
+
+                // simulate some long-running work
+                thread::sleep(Duration::from_millis(750));
+            }
+
+            println!("Thread 1 dropped lock");
+
+            // Do something else with the data
+            thread::sleep(Duration::from_millis(900));
+        });
 
 
+        let thread_arc = my_data.clone();
+        let t2 = thread::spawn(move || {
+            println!("Thread 2 attempting to acquire lock...");
+            if let Ok(mut x) = thread_arc.lock() {
+                println!("Thread 2 acquired lock");
+                for num in x.iter_mut() {
+                    *num *= 2;
+                }
 
+                // simulate wome long-running work
+                thread::sleep(Duration::from_millis(1250));
+            }
 
+            println!("Thread 2 dropped lock");
+            thread::sleep(Duration::from_millis(1100));
+        });
 
+        t1.join().unwrap();
+        t2.join().unwrap();
 
+        let my_data = my_data.lock().unwrap();
 
-
-
-
-
-
-
-
+        println!("Values are: {:?}", my_data);
+    }
 }

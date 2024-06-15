@@ -6,7 +6,6 @@ use std::process::exit;
 use clap::arg_enum;
 use log::{error, LevelFilter, warn};
 use structopt::StructOpt;
-use walkdir::err;
 
 use kvs::*;
 use kvs::thread_pool::ThreadPool;
