@@ -1,3 +1,6 @@
+use std::sync::{Arc, Barrier};
+use std::thread;
+
 #[test]
 fn panic_test() {
     std::panic::set_hook(Box::new(|panic_info| {
@@ -269,4 +272,58 @@ mod test_arc {
 
         println!("Values are: {:?}", my_data);
     }
+}
+
+#[test]
+fn test_barrier() {
+    // Step 1: place a Barrier in an Arc, and clone one Arc into each element of an array.
+    let thread_count = 8;
+    let shared = Barrier::new(thread_count);
+    let mut v = vec![];
+    let arc = Arc::new(shared);
+
+    for _ in 0..8 {
+        v.push(arc.clone());
+    }
+
+    // Step 2: loop over vector elements, and create thread for each element.
+    let mut children = vec![];
+    for item in v {
+        children.push(thread::spawn(move || {
+            // Step 3: run some code before the wait() function is called on the Barrier, and some after.
+            println!("Part A");
+            item.wait();
+            println!("Part B");
+        }));
+    }
+
+    // Step 4: join all threads
+    for child in children {
+        child.join().unwrap();
+    }
+}
+
+
+#[test]
+fn test_barrier_block_thread() {
+    let n = 10;
+    let mut handles = Vec::with_capacity(n);
+    let barrier = Arc::new(Barrier::new(n));
+
+    for _ in 0..n {
+        let c = Arc::clone(&barrier);
+        handles.push(thread::spawn(move || {
+            println!("before await");
+            c.wait();
+            println!("after wait");
+        }));
+    }
+
+
+
+    for handle in handles {
+        handle.join().unwrap();
+    }
+
+
 }

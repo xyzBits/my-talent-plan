@@ -131,6 +131,10 @@ fn compaction() -> Result<()> {
 fn concurrent_set() -> Result<()> {
     let temp_dir = TempDir::new().expect("unable to create temporary working directory");
     let store = KvStore::open(temp_dir.path())?;
+
+    // Creates a new barrier that can block a given number of threads
+    // A barrier will block n-1 threads which call wait() and then wake up all threads
+    // at once when the nth thread calls wait()
     let barrier = Arc::new(Barrier::new(1001));
     for i in 0..1000 {
         let store = store.clone();
