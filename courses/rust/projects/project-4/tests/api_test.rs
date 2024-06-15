@@ -254,7 +254,7 @@ mod test_arc {
                     *num *= 2;
                 }
 
-                // simulate wome long-running work
+                // simulate some long-running work
                 thread::sleep(Duration::from_millis(1250));
             }
 

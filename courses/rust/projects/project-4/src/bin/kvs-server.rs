@@ -1,13 +1,14 @@
+use std::{env, fs};
 use std::env::current_dir;
-use std::fs;
 use std::net::SocketAddr;
 use std::process::exit;
 
 use clap::arg_enum;
-use log::{error, LevelFilter, warn};
+use log::{error, info, LevelFilter, warn};
 use structopt::StructOpt;
 
 use kvs::*;
+use kvs::server::KvsServer;
 use kvs::thread_pool::ThreadPool;
 
 const DEFAULT_LISTENING_ADDRESS: &str = "127.0.0.1:4000";
@@ -50,7 +51,6 @@ fn main() {
 
     let mut opt = Opt::from_args();
     let res = current_engine().and_then(move |curr_engine| {
-
         if opt.engine.is_none() {
             opt.engine = curr_engine;
         }
@@ -71,11 +71,34 @@ fn main() {
 
 
 fn run(opt: Opt) -> Result<()> {
-    todo!()
+    let engine = opt.engine.unwrap_or(DEFAULT_ENGINE);
+    info!("kvs-server {}", env!("CARGO_PKG_VERSION"));
+    info!("Storage engine: {}", engine);
+    info!("Listening on {}", opt.addr   );
+
+    // write engine to engine file
+    fs::write(current_dir()?.join("engine"), format!("{}", engine))?;
+
+    // the thread pool is used to receive the tcp connection stream
+    let pool = RayonThreadPool::new(num_cpus::get() as u32)?;
+
+    match engine {
+        Engine::kvs => run_with(
+            KvStore::open(env::current_dir()?)?,
+            pool,
+            opt.addr,
+        ),
+        Engine::sled => run_with(
+            SledKvsEngine::new(sled::open(env::current_dir()?)?),
+            pool,
+            opt.addr,
+        )
+    }
 }
 
 pub fn run_with<E: KvsEngine, P: ThreadPool>(engine: E, pool: P, addr: SocketAddr) -> Result<()> {
-    todo!()
+    let server = KvsServer::new(engine, pool);
+    server.run(addr)
 }
 
 fn current_engine() -> Result<Option<Engine>> {

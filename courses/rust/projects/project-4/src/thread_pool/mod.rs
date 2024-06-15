@@ -4,6 +4,8 @@ mod naive;
 mod rayon;
 mod shared_queue;
 
+pub use rayon::RayonThreadPool;
+
 /// The trait that all thread pools should implement.
 pub trait ThreadPool {
     /// Creates a new thread pool, immediately spawning the specified number of

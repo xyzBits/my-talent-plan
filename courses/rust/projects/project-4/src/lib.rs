@@ -13,3 +13,4 @@ pub mod client;
 pub use error::{Result, KvsError};
 
 pub use engines::{KvsEngine, KvStore, SledKvsEngine};
+pub use thread_pool::RayonThreadPool;
