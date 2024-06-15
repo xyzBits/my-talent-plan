@@ -6,13 +6,13 @@ use std::io::{BufReader, BufWriter, Read, Seek, SeekFrom, Write};
 use std::ops::Range;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
-use std::sync::atomic::AtomicU64;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use crossbeam_skiplist::SkipMap;
 use serde::{Deserialize, Serialize};
 
+use crate::{KvsError, Result};
 use crate::engines::KvsEngine;
-use crate::Result;
 
 const COMPACTION_THRESHOLD: u64 = 1024 * 1024;
 
@@ -102,16 +102,41 @@ impl KvStore {
 }
 
 impl KvsEngine for KvStore {
+    /// Sets the value of a string key to a string.
+    ///
+    /// If the key already exists, the previous value will be overwritten.
+    ///
+    /// # Errors
+    ///
+    /// It propagates I/O or serialization errors during writing the log.
     fn set(&self, key: String, value: String) -> Result<()> {
-        todo!()
+        self.writer.lock().unwrap().set(key, value)
     }
 
+    /// Gets the string value of a given string key.
+    ///
+    /// Returns `None` if the given key does not exist.
     fn get(&self, key: String) -> Result<Option<String>> {
-        todo!()
+        if let Some(cmd_pos) = self.index.get(&key) {
+            if let Command::Set { value, .. } = self.reader.read_command(*cmd_pos.value())? {
+                Ok(Some(value))
+            } else {
+                Err(KvsError::UnexpectedCommandType)
+            }
+        } else {
+            Ok(None)
+        }
     }
 
+    /// Remove a given key.
+    ///
+    /// # Error
+    ///
+    /// It returns `KvsError::KeyNotFound` if the given key is not found.
+    ///
+    /// It propagates I/O or serialization errors during writing the log.
     fn remove(&self, key: String) -> Result<()> {
-        todo!()
+        self.writer.lock().unwrap().remove(key)
     }
 }
 
@@ -136,24 +161,53 @@ impl KvStoreReader {
     /// in-memory index contains no entries with generation number less than safe_point.
     /// So we can safely close file handles and the stale files can be deleted.
     fn close_stale_handles(&self) {
-        todo!()
+        let mut readers = self.readers.borrow_mut();
+        while !readers.is_empty() {
+            let first_gen = *readers.keys().next().unwrap();
+            if self.safe_point.load(Ordering::SeqCst) <= first_gen {
+                break;
+            }
+            readers.remove(&first_gen)
+        }
     }
 
     /// Read the log file at the given `CommandPos`.
     fn read_and<F, R>(&self, cmd_pos: CommandPos, f: F) -> Result<R>
-        where F: FnOnce(io::Take<&mut BufReaderWithPos<File>>) -> Result<R> {
-        todo!()
+    where
+        F: FnOnce(io::Take<&mut BufReaderWithPos<File>>) -> Result<R>,
+    {
+        self.close_stale_handles();
+
+        let mut readers = self.readers.borrow_mut();
+        // Open the file if we haven't opened it in this `KvStoreReader`
+        // We don't use entry API here because we want the errors to be propagated
+        if !readers.contains_key(&cmd_pos.gen) {
+            let reader = BufReaderWithPos::new(File::open(log_path(&self.path, cmd_pos.gen))?)?;
+            readers.insert(cmd_pos.gen, reader);
+        }
+
+        let reader = readers.get_mut(&cmd_pos.gen).unwrap();
+        reader.seek(SeekFrom::Start(cmd_pos.pos))?;
+        let cmd_reader = reader.take(cmd_pos.len);
+        f(cmd_reader)
     }
 
     /// Read the log file at the given `CommandPos` and deserialize it to `Command`
     fn read_command(&self, cmd_pos: CommandPos) -> Result<Command> {
-        todo!()
+        self.read_and(cmd_pos, |cmd_reader| {
+            Ok(serde_json::from_reader(cmd_reader)?)
+        })
     }
 }
 
 impl Clone for KvStoreReader {
     fn clone(&self) -> Self {
-        todo!()
+        KvStoreReader {
+            path: Arc::clone(&self.path),
+            safe_point: Arc::clone(&self.safe_point),
+            // don't use other KvStoreReader's readers
+            readers: RefCell::new(BTreeMap::new()),
+        }
     }
 }
 
