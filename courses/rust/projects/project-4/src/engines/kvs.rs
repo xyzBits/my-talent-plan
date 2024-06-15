@@ -1,7 +1,8 @@
 use std::{fs, io};
 use std::cell::RefCell;
 use std::collections::BTreeMap;
-use std::fs::File;
+use std::ffi::OsStr;
+use std::fs::{File, OpenOptions};
 use std::io::{BufReader, BufWriter, Read, Seek, SeekFrom, Write};
 use std::ops::Range;
 use std::path::{Path, PathBuf};
@@ -9,7 +10,9 @@ use std::sync::{Arc, Mutex};
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use crossbeam_skiplist::SkipMap;
+use log::error;
 use serde::{Deserialize, Serialize};
+use serde_json::Deserializer;
 
 use crate::{KvsError, Result};
 use crate::engines::KvsEngine;
@@ -167,7 +170,7 @@ impl KvStoreReader {
             if self.safe_point.load(Ordering::SeqCst) <= first_gen {
                 break;
             }
-            readers.remove(&first_gen)
+            readers.remove(&first_gen);
         }
     }
 
@@ -224,45 +227,171 @@ struct KvStoreWriter {
 
 impl KvStoreWriter {
     fn set(&mut self, key: String, value: String) -> Result<()> {
-        todo!()
+        let cmd = Command::set(key, value);
+        let pos = self.writer.pos;
+
+        serde_json::to_writer(&mut self.writer, &cmd)?;
+        self.writer.flush()?;
+
+        if let Command::Set { key, .. } = cmd {
+            if let Some(old_cmd) = self.index.get(&key) {
+                self.uncompacted += old_cmd.value().len;
+            }
+
+            self.index
+                .insert(key, (self.current_gen, pos..self.writer.pos).into());
+        }
+
+        if self.uncompacted > COMPACTION_THRESHOLD {
+            self.compact()?;
+        }
+
+        Ok(())
     }
 
     fn remove(&mut self, key: String) -> Result<()> {
-        todo!()
+        if self.index.contains_key(&key) {
+            let cmd = Command::remove(key);
+            let pos = self.writer.pos;
+            serde_json::to_writer(&mut self.writer, &cmd)?;
+            self.writer.flush()?;
+
+            if let Command::Remove { key } = cmd {
+                let old_cmd = self.index.remove(&key).expect("key not found");
+                self.uncompacted += old_cmd.value().len;
+
+                // the "remove" command itself can be deleted in the next compaction
+                // so we add its length to `uncompacted`
+                self.uncompacted += self.writer.pos - pos;
+            }
+            if self.uncompacted > COMPACTION_THRESHOLD {
+                self.compact()?;
+            }
+
+            Ok(())
+        } else {
+            Err(KvsError::KeyNotFound)
+        }
     }
 
     /// Clears stale entries in the log.
     fn compact(&mut self) -> Result<()> {
-        todo!()
+        // increase current gen by 2. current_gen + 1 is for the compaction file
+        let compaction_gen = self.current_gen + 1;
+        self.current_gen += 2;
+        self.writer = new_log_file(&self.path, self.current_gen)?;
+
+        let mut compaction_writer = new_log_file(&self.path, compaction_gen)?;
+
+        let mut new_pos = 0; // pos in the new log file
+        for entry in self.index.iter() {
+            let len = self.reader.read_and(*entry.value(), |mut entry_reader| {
+                Ok(io::copy(&mut entry_reader, &mut compaction_writer)?)
+            })?;
+            self.index.insert(
+                entry.key().clone(),
+                (compaction_gen, new_pos..new_pos + len).into(),
+            );
+            new_pos += len;
+        }
+        compaction_writer.flush()?;
+
+        self.reader
+            .safe_point
+            .store(compaction_gen, Ordering::SeqCst);
+        self.reader.close_stale_handles();
+
+        // remove stale log files
+        // Note that actually these files are not deleted immediately because `KvStoreReader`s
+        // still keep open file handles. When `KvStoreReader` is used next time, it will clear
+        // its stale file handles. On Unix, the files will be deleted after all the handles
+        // are closed. On Windows, the deletions below will fail and stale files are expected
+        // to be deleted in the next compaction.
+
+        let stale_gens = sorted_gen_list(&self.path)?
+            .into_iter()
+            .filter(|&gen| gen < compaction_gen);
+        for stale_gen in stale_gens {
+            let file_path = log_path(&self.path, stale_gen);
+            if let Err(e) = fs::remove_file(&file_path) {
+                error!("{:?} cannot be deleted: {}", file_path, e);
+            }
+        }
+        self.uncompacted = 0;
+
+        Ok(())
     }
 }
-
 
 /// Create a new log file with given generation number and add the reader to the readers map.
 ///
 /// Returns the writer to the log.
 fn new_log_file(path: &Path, gen: u64) -> Result<BufWriterWithPos<File>> {
-    todo!()
+    let path = log_path(&path, gen);
+    let writer = BufWriterWithPos::new(
+        OpenOptions::new()
+            .create(true)
+            .write(true)
+            .append(true)
+            .open(&path)?,
+    )?;
+    Ok(writer)
 }
 
 /// Returns sorted generation numbers in the given directory
 fn sorted_gen_list(path: &Path) -> Result<Vec<u64>> {
-    todo!()
+    let mut gen_list: Vec<u64> = fs::read_dir(&path)?
+        .flat_map(|res| -> Result<_> { Ok(res?.path()) })
+        .filter(|path| path.is_file() && path.extension() == Some("log".as_ref()))
+        .flat_map(|path| {
+            path.file_name()
+                .and_then(OsStr::to_str)
+                .map(|s| s.trim_end_matches(".log"))
+                .map(str::parse::<u64>)
+        })
+        .flatten()
+        .collect();
+    gen_list.sort_unstable();
+    Ok(gen_list)
 }
 
-/// Load the whole log file and store value locations in the index map
+/// Load the whole log file and store value locations in the index map.
 ///
-/// Returns how many bytes can be saved after a compaction
+/// Returns how many bytes can be saved after a compaction.
 fn load(
     gen: u64,
     reader: &mut BufReaderWithPos<File>,
     index: &SkipMap<String, CommandPos>,
 ) -> Result<u64> {
-    todo!()
+    // To make sure we read from the beginning of the file
+    let mut pos = reader.seek(SeekFrom::Start(0))?;
+    let mut stream = Deserializer::from_reader(reader).into_iter::<Command>();
+    let mut uncompacted = 0; // number of bytes that can be saved after a compaction
+    while let Some(cmd) = stream.next() {
+        let new_pos = stream.byte_offset() as u64;
+        match cmd? {
+            Command::Set { key, .. } => {
+                if let Some(old_cmd) = index.get(&key) {
+                    uncompacted += old_cmd.value().len;
+                }
+                index.insert(key, (gen, pos..new_pos).into());
+            }
+            Command::Remove { key } => {
+                if let Some(old_cmd) = index.remove(&key) {
+                    uncompacted += old_cmd.value().len;
+                }
+                // the "remove" command itself can be deleted in the next compaction
+                // so we add its length to `uncompacted`
+                uncompacted += new_pos - pos;
+            }
+        }
+        pos = new_pos;
+    }
+    Ok(uncompacted)
 }
 
 fn log_path(dir: &Path, gen: u64) -> PathBuf {
-    todo!()
+    dir.join(format!("{}.log", gen))
 }
 
 /// Struct representing a command
