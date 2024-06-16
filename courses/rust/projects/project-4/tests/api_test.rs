@@ -327,3 +327,79 @@ fn test_barrier_block_thread() {
 
 
 }
+
+#[cfg(test)]
+mod cell_test {
+    use std::cell::Cell;
+
+    #[derive(Debug)]
+    struct Person {
+        name: String,
+        age: u32,
+    }
+
+    #[test]
+    fn test_mutability() {
+        let mut person = Person {
+            name: "bitch".to_string(),
+            age: 23
+        };
+
+        println!("{:?}", person);
+        person.age = 344;
+        println!("{:?}", person);
+
+    }
+
+    #[derive(Debug)]
+    struct CellPerson {
+        name: String,
+        age: Cell<u32>,
+    }
+
+    #[test]
+    fn test_cell_mutate() {
+        let person = CellPerson {
+            name: "bitch".to_string(),
+            age: Cell::new(21),
+        };
+
+        println!("{:?}", person);
+
+        person.age.set(312);
+        println!("{:?}", person);
+    }
+}
+
+#[cfg(test)]
+mod ref_cell_test {
+    use std::cell::RefCell;
+
+    #[derive(Debug)]
+    struct User {
+        id: u32,
+        year_registered: u32,
+        username: String,
+        active: RefCell<bool>,
+    }
+    #[test]
+    fn test_cell() {
+        let bitch = User {
+            id: 1,
+            year_registered: 2029,
+            username: "bitch".to_string(),
+            active: RefCell::new(true),
+        };
+        println!("{:?}", bitch.active);
+    }
+}
+
+
+
+
+
+
+
+
+
+
