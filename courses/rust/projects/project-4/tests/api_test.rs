@@ -353,7 +353,9 @@ mod cell_test {
 
     #[derive(Debug)]
     struct CellPerson {
+        // 一个人的名字从出生就决定了，不提供后续修改，
         name: String,
+        // 而年龄每一年都在变，提供后续 修改
         age: Cell<u32>,
     }
 
