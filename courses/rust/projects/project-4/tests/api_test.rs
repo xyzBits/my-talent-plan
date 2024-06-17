@@ -395,6 +395,20 @@ mod ref_cell_test {
 }
 
 
+#[cfg(test)]
+mod box_test {
+    use std::ops::Deref;
+
+    #[test]
+    fn test_1() {
+        let b = Box::new(1);
+        let k = b.deref();
+        println!("k = {}", k);
+        assert_eq!(*k, 1);
+    }
+}
+
+
 
 
 
