@@ -399,7 +399,11 @@ mod ref_cell_test {
 
 #[cfg(test)]
 mod box_test {
+    use std::fs;
     use std::ops::Deref;
+    use std::path::PathBuf;
+    use std::sync::Arc;
+    use tempfile::TempDir;
 
     #[test]
     fn test_1() {
@@ -407,6 +411,20 @@ mod box_test {
         let k = b.deref();
         println!("k = {}", k);
         assert_eq!(*k, 1);
+    }
+
+    #[test]
+    fn test_2() {
+        let temp_dir = TempDir::new().expect("unable to create temporary working directory");
+
+        let path = temp_dir.path();
+
+        let path: PathBuf = path.into();
+
+        let path_arc = Arc::new(path);
+        let path = &path_arc;
+
+        fs::create_dir_all(&*path_arc).unwrap();
     }
 }
 

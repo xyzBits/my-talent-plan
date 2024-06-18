@@ -371,7 +371,8 @@ fn load(
 ) -> Result<u64> {
     // To make sure we read from the beginning of the file
     let mut pos = reader.seek(SeekFrom::Start(0))?;
-    let mut stream = Deserializer::from_reader(reader).into_iter::<Command>();
+    let mut stream =
+        Deserializer::from_reader(reader).into_iter::<Command>();
     let mut uncompacted = 0; // number of bytes that can be saved after a compaction
     while let Some(cmd) = stream.next() {
         let new_pos = stream.byte_offset() as u64;
